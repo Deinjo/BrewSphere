@@ -13,8 +13,7 @@
 #include "services/radar_location.h"
 #include "services/weather_time.h"
 #include "services/wifi_setup.h"
-#include "ui/radar_display.h"
-#include "ui/radar_range.h"
+#include "ui/brew_display.h"
 #include "ui/status_screens.h"
 
 namespace {
@@ -22,7 +21,6 @@ namespace {
 bool g_radar_visible = false;
 unsigned long g_wifi_down_since = 0;
 unsigned long g_last_reconnect_ms = 0;
-unsigned long g_last_adsb_fetch_ms = 0;
 
 void showRadarIfConnected() {
   if (WiFi.status() != WL_CONNECTED) {
@@ -30,19 +28,13 @@ void showRadarIfConnected() {
     return;
   }
   services::weather::begin();
-  ui::radarDisplayDraw();
+  ui::brewDisplayDraw();
   g_radar_visible = true;
 }
 
 void onRangeTap() {
-  ui::radar::rangeNext();
-  char range_label[12];
-  ui::radar::formatCurrentRing3Label(range_label, sizeof(range_label));
-  Serial.printf("Range: %s (outer ~%.0f km)\n", range_label,
-                ui::radar::rangeCurrent().outer_km);
-
   if (g_radar_visible && WiFi.status() == WL_CONNECTED) {
-    ui::radarDisplayDraw();
+    ui::brewDisplayDraw();
   }
 }
 
@@ -51,17 +43,6 @@ void handleBootButton() {
   if (bootButtonConsumeTap()) {
     onRangeTap();
   }
-}
-
-void fetchAndDrawAircraft() {
-  const float fetch_km = ui::radar::fetchRadiusKm();
-  if (!services::adsb::fetchUpdate(services::location::lat(),
-                                   services::location::lon(), fetch_km)) {
-    handleBootButton();
-    return;
-  }
-  ui::radarDisplayRefreshAircraft();
-  handleBootButton();
 }
 
 }  // namespace
@@ -78,9 +59,7 @@ void setup() {
     statusScreenPortal();
   }
   services::location::init();
-  ui::radar::rangeInit();
   services::settings::init();
-  services::adsb::setPollFn(wifiLoop);
   services::weather::setPollFn(wifiLoop);
 
   if (wifiSetupConnect()) {
@@ -92,7 +71,7 @@ void loop() {
   handleBootButton();
   wifiLoop();
   if (g_radar_visible) {
-    ui::radarDisplayTick();
+    ui::brewDisplayTick();
   }
 
   if (services::ota::inProgress()) {
@@ -123,14 +102,9 @@ void loop() {
     g_wifi_down_since = 0;
     if (!g_radar_visible) {
       showRadarIfConnected();
-    } else if (millis() - g_last_adsb_fetch_ms >= config::kAdsbFetchIntervalMs) {
-      g_last_adsb_fetch_ms = millis();
-      fetchAndDrawAircraft();
     } else if (services::weather::refreshIfDue(
                    services::location::lat(), services::location::lon())) {
-      ui::radarDisplayRefreshAircraft();
-    } else if (services::adsb::enrichOnePending()) {
-      ui::radarDisplayRefreshAircraft();
+      ui::brewDisplayRefresh();
     }
   }
 
