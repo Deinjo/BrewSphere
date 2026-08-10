@@ -58,5 +58,12 @@ pio device monitor
 Runtime data services:
 
 
-## Credits
-This project is baded on fork of WatskeBart/ESP32-Plane-Radar by WatskeBart which is bases (fork) of MatixYo/ESP32-Plane-Radar by MatixYo. All credit for the original concept and implementation goes to them.
+## Lizenz und Herkunft
+
+BrewSphere basiert teilweise auf dem Projekt WatskeBart/ESP32-Plane-Radar by WatskeBart welches auf of MatixYo/ESP32-Plane-Radar by MatixYo basiert.
+
+Der übernommene Code steht unter der MIT-Lizenz. Die ursprüngliche
+Lizenzinformation befindet sich in der Datei [LICENSE](LICENSE).
+
+Eigene Weiterentwicklungen dieses Projekts stammen von Deinjo und stehen,
+soweit nicht anders angegeben, ebenfalls unter der MIT-Lizenz.
