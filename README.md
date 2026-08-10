@@ -57,3 +57,6 @@ pio device monitor
 
 Runtime data services:
 
+
+## Credits
+This project is baded on fork of WatskeBart/ESP32-Plane-Radar by WatskeBart which is bases (fork) of MatixYo/ESP32-Plane-Radar by MatixYo. All credit for the original concept and implementation goes to them.
