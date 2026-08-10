@@ -16,10 +16,10 @@ namespace {
 
 constexpr int kCenterX = 120;
 constexpr int kCenterY = 120;
-constexpr uint16_t kBackground = 0x0310;
-constexpr uint16_t kPanel = 0x0A29;
-constexpr uint16_t kPanelEdge = 0x2D5A;
-constexpr uint16_t kPanelShadow = 0x061A;
+constexpr uint16_t kBackground = 0x0043;  // RGB ~ 0, 8, 24
+constexpr uint16_t kPanel = 0x08C5;       // RGB ~ 8, 54, 41
+constexpr uint16_t kPanelEdge = 0x2A9F;   // muted steel blue
+constexpr uint16_t kPanelShadow = 0x0064; // RGB ~ 0, 12, 33
 constexpr uint16_t kBlue = 0x24BF;
 constexpr uint16_t kCyan = 0x5DFF;
 constexpr uint16_t kCream = 0xFFB0;
@@ -76,19 +76,19 @@ void drawArcSegment(float start_deg, float end_deg, int radius, float width,
 }
 
 void drawGaugeRing(float attenuation) {
+  (void)attenuation;
   drawArcSegment(140.0f, 260.0f, 108, 5.0f, kBlue);
   drawArcSegment(260.0f, 335.0f, 108, 5.0f, kCyan);
   drawArcSegment(335.0f, 400.0f, 108, 5.0f, kCream);
 
   constexpr float kDegToRad = 0.01745329252f;
   constexpr int kDotCount = 43;
-  const float progress = clampPercent(attenuation) / 100.0f;
   for (int i = 0; i < kDotCount; ++i) {
     const float ratio = static_cast<float>(i) / (kDotCount - 1);
     const float angle = (140.0f + 260.0f * ratio) * kDegToRad;
     const int x = kCenterX + static_cast<int>(std::lround(std::cos(angle) * 96));
     const int y = kCenterY + static_cast<int>(std::lround(std::sin(angle) * 96));
-    const uint16_t color = ratio <= progress ? kCream : 0x39B6;
+    const uint16_t color = ratio < 0.52f ? kBlue : kCream;
     s_draw->fillCircle(x, y, 2, color);
   }
 }
@@ -140,11 +140,8 @@ const char* displayStatus(const char* status) {
 }
 
 void drawInfoPanels() {
-  s_draw->fillTriangle(25, 72, 198, 72, 211, 151, kPanelShadow);
-  s_draw->fillTriangle(25, 72, 211, 151, 38, 156, kPanelShadow);
-  s_draw->drawWideLine(25, 72, 198, 72, 1.0f, kPanelEdge);
-  s_draw->drawWideLine(38, 156, 211, 151, 1.0f, kPanelEdge);
-
+  // The reference keeps the main gauge open; only the lower batch card is a
+  // filled panel.
   s_draw->fillTriangle(35, 166, 207, 166, 176, 216, kPanel);
   s_draw->fillTriangle(35, 166, 176, 216, 64, 216, kPanel);
   s_draw->drawWideLine(35, 166, 207, 166, 1.0f, kPanelEdge);
@@ -209,6 +206,8 @@ void brewDisplayDraw() {
   }
   drawCentered(attenuation, 45, kCream, 0.58f);
 
+  s_draw->drawWideLine(72, 67, 103, 67, 1.0f, kMuted);
+  s_draw->drawWideLine(137, 67, 168, 67, 1.0f, kMuted);
   drawCentered("PLATO", 67, kWhite, 0.5f);
   char gravity[20] = {};
   if (data.specific_gravity > 0.0f) {
@@ -217,7 +216,7 @@ void brewDisplayDraw() {
   } else {
     snprintf(gravity, sizeof(gravity), "--.- P");
   }
-  drawCentered(gravity, 91, kCream, 1.48f);
+  drawCentered(gravity, 91, kCream, 2.0f);
   char target[20] = {};
   if (data.estimated_final_gravity > 0.0f) {
     snprintf(target, sizeof(target), "ZIEL %.1f P",

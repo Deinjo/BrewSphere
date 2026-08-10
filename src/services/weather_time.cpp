@@ -236,12 +236,15 @@ bool fetch(double, double) {
                                : NAN;
   next_data.temperature_c = s_temperature_c;
   next_data.fridge_temperature_c = s_fridge_temperature_c;
-  next_data.specific_gravity = reading["sg"] | 0.0f;
+  next_data.specific_gravity = reading["sg"].is<float>()
+                                   ? reading["sg"].as<float>()
+                                   : 0.0f;
   next_data.reading_time_ms = reading["time"] | static_cast<uint64_t>(0);
   s_data = next_data;
   s_valid = true;
-  Serial.printf("brewfather: temp %.1f C, fridge %.1f C, sensor %s\n",
+  Serial.printf("brewfather: temp %.1f C, fridge %.1f C, sg %.3f, sensor %s\n",
                 s_temperature_c, s_fridge_temperature_c,
+                next_data.specific_gravity,
                 reading["type"] | "unknown");
   return true;
 }
