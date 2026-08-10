@@ -19,6 +19,7 @@
 #include "services/ota_update.h"
 #include "services/radar_location.h"
 #include "ui/brew_display.h"
+#include "ui/radar_range.h"
 #include "ui/status_screens.h"
 
 portMUX_TYPE s_boot_mux = portMUX_INITIALIZER_UNLOCKED;
