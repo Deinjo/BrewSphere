@@ -17,8 +17,9 @@ namespace {
 constexpr int kCenterX = 120;
 constexpr int kCenterY = 120;
 constexpr uint16_t kBackground = 0x0310;
-constexpr uint16_t kPanel = 0x0B25;
+constexpr uint16_t kPanel = 0x0A29;
 constexpr uint16_t kPanelEdge = 0x2D5A;
+constexpr uint16_t kPanelShadow = 0x061A;
 constexpr uint16_t kBlue = 0x24BF;
 constexpr uint16_t kCyan = 0x5DFF;
 constexpr uint16_t kCream = 0xFFB0;
@@ -55,33 +56,52 @@ void drawCentered(const char* text, int y, uint16_t color, float size) {
   s_draw->drawString(text, kCenterX, y);
 }
 
-void drawGaugeRing(float attenuation) {
-  constexpr int kDotCount = 54;
-  constexpr float kStartDeg = 140.0f;
-  constexpr float kEndDeg = 400.0f;
+void drawArcSegment(float start_deg, float end_deg, int radius, float width,
+                    uint16_t color) {
   constexpr float kDegToRad = 0.01745329252f;
-  const float progress = clampPercent(attenuation) / 100.0f;
-
-  for (int i = 0; i < kDotCount; ++i) {
-    const float ratio = static_cast<float>(i) / (kDotCount - 1);
-    const float angle = (kStartDeg + (kEndDeg - kStartDeg) * ratio) * kDegToRad;
-    const int radius = 108;
+  constexpr int kSteps = 34;
+  int previous_x = 0;
+  int previous_y = 0;
+  for (int i = 0; i <= kSteps; ++i) {
+    const float ratio = static_cast<float>(i) / kSteps;
+    const float angle = (start_deg + (end_deg - start_deg) * ratio) * kDegToRad;
     const int x = kCenterX + static_cast<int>(std::lround(std::cos(angle) * radius));
     const int y = kCenterY + static_cast<int>(std::lround(std::sin(angle) * radius));
-    const bool active = ratio <= progress;
-    s_draw->fillCircle(x, y, active ? 3 : 2,
-                       active ? (ratio < 0.72f ? kBlue : kCyan) : 0x31B6);
+    if (i > 0) {
+      s_draw->drawWideLine(previous_x, previous_y, x, y, width, color);
+    }
+    previous_x = x;
+    previous_y = y;
   }
 }
 
-void drawGaugeTicks() {
+void drawGaugeRing(float attenuation) {
+  drawArcSegment(140.0f, 260.0f, 108, 5.0f, kBlue);
+  drawArcSegment(260.0f, 335.0f, 108, 5.0f, kCyan);
+  drawArcSegment(335.0f, 400.0f, 108, 5.0f, kCream);
+
   constexpr float kDegToRad = 0.01745329252f;
-  for (int i = 0; i <= 10; ++i) {
-    const float angle = (140.0f + i * 26.0f) * kDegToRad;
-    const int x = kCenterX + static_cast<int>(std::lround(std::cos(angle) * 94));
-    const int y = kCenterY + static_cast<int>(std::lround(std::sin(angle) * 94));
-    s_draw->fillCircle(x, y, 1, kCream);
+  constexpr int kDotCount = 43;
+  const float progress = clampPercent(attenuation) / 100.0f;
+  for (int i = 0; i < kDotCount; ++i) {
+    const float ratio = static_cast<float>(i) / (kDotCount - 1);
+    const float angle = (140.0f + 260.0f * ratio) * kDegToRad;
+    const int x = kCenterX + static_cast<int>(std::lround(std::cos(angle) * 96));
+    const int y = kCenterY + static_cast<int>(std::lround(std::sin(angle) * 96));
+    const uint16_t color = ratio <= progress ? kCream : 0x39B6;
+    s_draw->fillCircle(x, y, 2, color);
   }
+}
+
+void drawGaugeNeedle(float attenuation) {
+  constexpr float kDegToRad = 0.01745329252f;
+  const float ratio = clampPercent(attenuation) / 100.0f;
+  const float angle = (140.0f + 260.0f * ratio) * kDegToRad;
+  const int end_x = kCenterX + static_cast<int>(std::lround(std::cos(angle) * 92));
+  const int end_y = kCenterY + static_cast<int>(std::lround(std::sin(angle) * 92));
+  s_draw->drawWideLine(kCenterX, kCenterY, end_x, end_y, 1.5f, kCream);
+  s_draw->fillCircle(kCenterX, kCenterY, 4, kCream);
+  s_draw->fillCircle(kCenterX, kCenterY, 2, kBackground);
 }
 
 void fitText(char* output, size_t output_len, const char* input, int max_width) {
@@ -119,9 +139,18 @@ const char* displayStatus(const char* status) {
   return status;
 }
 
+void drawInfoPanels() {
+  s_draw->fillTriangle(25, 72, 198, 72, 211, 151, kPanelShadow);
+  s_draw->fillTriangle(25, 72, 211, 151, 38, 156, kPanelShadow);
+  s_draw->drawWideLine(25, 72, 198, 72, 1.0f, kPanelEdge);
+  s_draw->drawWideLine(38, 156, 211, 151, 1.0f, kPanelEdge);
+
+  s_draw->fillTriangle(35, 166, 207, 166, 176, 216, kPanel);
+  s_draw->fillTriangle(35, 166, 176, 216, 64, 216, kPanel);
+  s_draw->drawWideLine(35, 166, 207, 166, 1.0f, kPanelEdge);
+}
+
 void drawBatchPanel(const services::weather::BrewData& data) {
-  s_draw->fillRoundRect(35, 168, 170, 48, 8, kPanel);
-  s_draw->drawRoundRect(35, 168, 170, 48, 8, kPanelEdge);
 
   char batch[80] = {};
   if (data.batch_number > 0) {
@@ -166,7 +195,8 @@ void brewDisplayDraw() {
   s_draw->drawCircle(kCenterX, kCenterY, 112, 0x12B4);
 
   drawGaugeRing(data.measured_attenuation_percent);
-  drawGaugeTicks();
+  drawGaugeNeedle(data.measured_attenuation_percent);
+  drawInfoPanels();
 
   drawCentered("ATTENUATION", 27, kCream, 0.42f);
   char attenuation[20] = {};
