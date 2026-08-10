@@ -185,6 +185,7 @@ void brewDisplayDraw() {
   if (!s_frame_ready) {
     s_frame.setColorDepth(16);
     s_frame.createSprite(240, 240);
+    displayFontEnsureLoaded(s_frame);
     s_frame_ready = true;
   }
   s_draw = &s_frame;
@@ -293,11 +294,6 @@ void brewDisplayWriteBmp(Print& output) {
       uint8_t red = static_cast<uint8_t>((pixel >> 11) & 0x1F);
       const uint8_t green = static_cast<uint8_t>((pixel >> 5) & 0x3F);
       uint8_t blue = static_cast<uint8_t>(pixel & 0x1F);
-      if (config::kDisplayRgbOrder) {
-        const uint8_t channel = red;
-        red = blue;
-        blue = channel;
-      }
       row[x * 3] = static_cast<uint8_t>((blue << 3) | (blue >> 2));
       row[x * 3 + 1] = static_cast<uint8_t>((green << 2) | (green >> 4));
       row[x * 3 + 2] = static_cast<uint8_t>((red << 3) | (red >> 2));
