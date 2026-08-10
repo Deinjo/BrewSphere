@@ -187,7 +187,15 @@ void brewDisplayDraw() {
     snprintf(gravity, sizeof(gravity), "--.- P");
   }
   drawCentered(gravity, 91, kCream, 1.48f);
-  drawCentered(displayStatus(data.status), 113, kWhite, 0.52f);
+  char target[20] = {};
+  if (data.estimated_final_gravity > 0.0f) {
+    snprintf(target, sizeof(target), "ZIEL %.1f P",
+             platoFromSg(data.estimated_final_gravity));
+  } else {
+    snprintf(target, sizeof(target), "ZIEL --.- P");
+  }
+  drawCentered(target, 112, kMuted, 0.40f);
+  drawCentered(displayStatus(data.status), 126, kWhite, 0.52f);
 
   char temperature[32] = {};
   if (data.valid) {
@@ -201,7 +209,7 @@ void brewDisplayDraw() {
   } else {
     snprintf(temperature, sizeof(temperature), "--.- C   F --");
   }
-  drawCentered(temperature, 139, kCyan, 0.68f);
+  drawCentered(temperature, 148, kCyan, 0.62f);
 
   drawBatchPanel(data);
 
