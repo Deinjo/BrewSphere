@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 
 #include "config.h"
 #include "hardware/display.h"
@@ -72,6 +73,41 @@ void drawGaugeTicks() {
   }
 }
 
+void fitText(char* output, size_t output_len, const char* input, int max_width) {
+  if (output_len == 0) {
+    return;
+  }
+  snprintf(output, output_len, "%s", input != nullptr ? input : "");
+  if (tft.textWidth(output) <= max_width) {
+    return;
+  }
+
+  const size_t input_len = strlen(output);
+  for (size_t length = input_len; length > 0; --length) {
+    snprintf(output, output_len, "%.*s...", static_cast<int>(length), input);
+    if (tft.textWidth(output) <= max_width) {
+      return;
+    }
+  }
+  snprintf(output, output_len, "...");
+}
+
+const char* displayStatus(const char* status) {
+  if (status == nullptr || status[0] == '\0') {
+    return "BREWSPHERE";
+  }
+  if (strcmp(status, "Fermenting") == 0) {
+    return "GAERUNG";
+  }
+  if (strcmp(status, "Brewing") == 0) {
+    return "BRAUTAG";
+  }
+  if (strcmp(status, "Conditioning") == 0) {
+    return "REIFUNG";
+  }
+  return status;
+}
+
 void drawBatchPanel(const services::weather::BrewData& data) {
   tft.fillRoundRect(35, 168, 170, 48, 8, kPanel);
   tft.drawRoundRect(35, 168, 170, 48, 8, kPanelEdge);
@@ -85,14 +121,19 @@ void drawBatchPanel(const services::weather::BrewData& data) {
              data.batch_name[0] != '\0' ? data.batch_name : "WAITING");
   }
   setSmooth(0.52f);
+  char fitted_batch[48] = {};
+  fitText(fitted_batch, sizeof(fitted_batch), batch, 150);
   tft.setTextDatum(textdatum_t::middle_center);
   tft.setTextColor(kWhite, kPanel);
-  tft.drawString(batch, kCenterX, 183);
+  tft.drawString(fitted_batch, kCenterX, 183);
 
   const char* recipe = data.recipe_name[0] != '\0' ? data.recipe_name : data.status;
   setSmooth(0.42f);
+  char fitted_recipe[48] = {};
+  fitText(fitted_recipe, sizeof(fitted_recipe), recipe, 150);
   tft.setTextColor(kMuted, kPanel);
-  tft.drawString(recipe[0] != '\0' ? recipe : "BREWFATHER", kCenterX, 202);
+  tft.drawString(fitted_recipe[0] != '\0' ? fitted_recipe : "BREWFATHER",
+                 kCenterX, 202);
 }
 
 }  // namespace
@@ -127,8 +168,7 @@ void brewDisplayDraw() {
     snprintf(gravity, sizeof(gravity), "-.---");
   }
   drawCentered(gravity, 91, kCream, 1.48f);
-  drawCentered(data.status[0] != '\0' ? data.status : "BREWSPHERE", 113,
-               kWhite, 0.52f);
+  drawCentered(displayStatus(data.status), 113, kWhite, 0.52f);
 
   char temperature[32] = {};
   if (data.valid) {
@@ -142,7 +182,7 @@ void brewDisplayDraw() {
   } else {
     snprintf(temperature, sizeof(temperature), "--.- C   F --");
   }
-  drawCentered(temperature, 139, kCyan, 0.58f);
+  drawCentered(temperature, 139, kCyan, 0.68f);
 
   drawBatchPanel(data);
 
