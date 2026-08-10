@@ -166,7 +166,14 @@ bool fetch(double, double) {
     return false;
   }
 
-  const char* batch_id = batch_list[0]["_id"];
+  const String batch_id = batch_list[0]["_id"] | "";
+  if (batch_id.isEmpty()) {
+    Serial.println("brewfather: batch has no id");
+    return false;
+  }
+
+  // Release the list before opening the next TLS connection.
+  batches.clear();
 
   String batch_url = config::kBrewfatherApiBase;
   batch_url += "/batches/";
@@ -178,6 +185,35 @@ bool fetch(double, double) {
   if (!getJson(batch_url, authorization, batch)) {
     return false;
   }
+
+  BrewData next_data;
+  next_data.valid = true;
+  copyJsonString(batch["_id"], next_data.batch_id,
+                sizeof(next_data.batch_id));
+  copyJsonString(batch["name"], next_data.batch_name,
+                sizeof(next_data.batch_name));
+  copyJsonString(batch["recipe"]["name"], next_data.recipe_name,
+                sizeof(next_data.recipe_name));
+  copyJsonString(batch["status"], next_data.status, sizeof(next_data.status));
+  next_data.batch_number = batch["batchNo"] | 0;
+  next_data.original_gravity = batch["measuredOg"] | 0.0f;
+  next_data.estimated_final_gravity = batch["estimatedFg"] | 0.0f;
+  next_data.measured_final_gravity = batch["measuredFg"] | 0.0f;
+  next_data.measured_attenuation_percent =
+      batch["measuredAttenuation"] | 0.0f;
+
+  const uint64_t brew_date_ms = batch["brewDate"] | static_cast<uint64_t>(0);
+  if (brew_date_ms > 0 && clockValid()) {
+    const int64_t elapsed_seconds =
+        static_cast<int64_t>(time(nullptr)) -
+        static_cast<int64_t>(brew_date_ms / 1000ULL);
+    if (elapsed_seconds >= 0) {
+      next_data.brew_day = static_cast<int>(elapsed_seconds / 86400) + 1;
+    }
+  }
+
+  // Keep only the compact data model while fetching the reading.
+  batch.clear();
 
   String reading_url = config::kBrewfatherApiBase;
   reading_url += "/batches/";
@@ -198,36 +234,10 @@ bool fetch(double, double) {
   s_fridge_temperature_c = reading["fridgeTemp"].is<float>()
                                ? reading["fridgeTemp"].as<float>()
                                : NAN;
-
-  BrewData next_data;
-  next_data.valid = true;
-  copyJsonString(batch["_id"], next_data.batch_id,
-                sizeof(next_data.batch_id));
-  copyJsonString(batch["name"], next_data.batch_name,
-                sizeof(next_data.batch_name));
-  copyJsonString(batch["recipe"]["name"], next_data.recipe_name,
-                sizeof(next_data.recipe_name));
-  copyJsonString(batch["status"], next_data.status, sizeof(next_data.status));
-  next_data.batch_number = batch["batchNo"] | 0;
   next_data.temperature_c = s_temperature_c;
   next_data.fridge_temperature_c = s_fridge_temperature_c;
   next_data.specific_gravity = reading["sg"] | 0.0f;
-  next_data.original_gravity = batch["measuredOg"] | 0.0f;
-  next_data.estimated_final_gravity = batch["estimatedFg"] | 0.0f;
-  next_data.measured_final_gravity = batch["measuredFg"] | 0.0f;
-  next_data.measured_attenuation_percent =
-      batch["measuredAttenuation"] | 0.0f;
   next_data.reading_time_ms = reading["time"] | static_cast<uint64_t>(0);
-
-  const uint64_t brew_date_ms = batch["brewDate"] | static_cast<uint64_t>(0);
-  if (brew_date_ms > 0 && clockValid()) {
-    const int64_t elapsed_seconds =
-        static_cast<int64_t>(time(nullptr)) -
-        static_cast<int64_t>(brew_date_ms / 1000ULL);
-    if (elapsed_seconds >= 0) {
-      next_data.brew_day = static_cast<int>(elapsed_seconds / 86400) + 1;
-    }
-  }
   s_data = next_data;
   s_valid = true;
   Serial.printf("brewfather: temp %.1f C, fridge %.1f C, sensor %s\n",
