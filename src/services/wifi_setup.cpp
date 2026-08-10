@@ -18,8 +18,7 @@
 #include "services/display_settings.h"
 #include "services/ota_update.h"
 #include "services/radar_location.h"
-#include "ui/radar_range.h"
-#include "ui/radar_display.h"
+#include "ui/brew_display.h"
 #include "ui/status_screens.h"
 
 portMUX_TYPE s_boot_mux = portMUX_INITIALIZER_UNLOCKED;
@@ -131,7 +130,7 @@ void handleDisplayPage() {
   s_wm.server->send(200, "text/html",
                     "<!doctype html><html><head><meta name='viewport' "
                     "content='width=device-width,initial-scale=1'>"
-                    "<title>Plane Radar Display</title><style>"
+                     "<title>BrewSphere Display</title><style>"
                     "body{margin:0;padding:20px;background:#0d151e;color:#d7e0e9;"
                     "font-family:Segoe UI,Arial,sans-serif;text-align:center}"
                     "main{max-width:520px;margin:auto;background:#141f2a;"
@@ -141,7 +140,7 @@ void handleDisplayPage() {
                     "a{display:inline-block;margin-top:16px;padding:8px 13px;"
                     "background:#38596b;color:#eef5f8;border:1px solid #5e8191;"
                     "border-radius:6px;text-decoration:none}</style></head><body>"
-                    "<main><h2>Plane Radar Display</h2>"
+                     "<main><h2>BrewSphere Display</h2>"
                     "<img id='display' src='/display.bmp'>"
                     "<script>setInterval(function(){document.getElementById('display').src="
                     "'/display.bmp?t='+Date.now()},5000);</script>"
@@ -156,7 +155,7 @@ void handleDisplayBmp() {
   s_wm.server->setContentLength(kBmpSize);
   s_wm.server->send(200, "image/bmp", "");
   WiFiClient client = s_wm.server->client();
-  ui::radarDisplayWriteBmp(client);
+  ui::brewDisplayWriteBmp(client);
 }
 
 constexpr int kCoordParamLen = 20;
