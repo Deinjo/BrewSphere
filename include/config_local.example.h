@@ -11,3 +11,7 @@
 // Values are decimal degrees; do not use quotation marks.
 #define PLANE_RADAR_DEFAULT_RADAR_LAT 51.492605
 #define PLANE_RADAR_DEFAULT_RADAR_LON 7.451828
+
+// Brewfather API: generate a key with the batches.read scope.
+#define BREWFATHER_USER_ID "YOUR_BREWFATHER_USER_ID"
+#define BREWFATHER_API_KEY "YOUR_BREWFATHER_API_KEY"

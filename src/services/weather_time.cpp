@@ -2,12 +2,14 @@
 
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
+#include <mbedtls/base64.h>
 
 #include <ArduinoJson.h>
 
 #include <cmath>
 #include <cstdio>
 #include <ctime>
+#include <cstring>
 #include <sys/time.h>
 
 #include "config.h"
@@ -21,8 +23,7 @@ constexpr time_t kMinimumValidEpoch = 1609459200;  // 2021-01-01 UTC
 bool s_started = false;
 bool s_valid = false;
 float s_temperature_c = 0.0f;
-int s_humidity_percent = 0;
-int s_weather_code = -1;
+float s_fridge_temperature_c = NAN;
 int32_t s_utc_offset_seconds = 0;
 unsigned long s_last_attempt_ms = 0;
 double s_last_latitude = 999.0;
@@ -35,21 +36,6 @@ void pollNetwork() {
   if (s_poll_fn != nullptr) {
     s_poll_fn();
   }
-}
-
-const char* conditionLabel(int code) {
-  if (code == 0) return "CLEAR";
-  if (code == 1) return "MOSTLY CLEAR";
-  if (code == 2) return "PARTLY CLOUDY";
-  if (code == 3) return "OVERCAST";
-  if (code == 45 || code == 48) return "FOG";
-  if (code >= 51 && code <= 57) return "DRIZZLE";
-  if (code >= 61 && code <= 67) return "RAIN";
-  if (code >= 71 && code <= 77) return "SNOW";
-  if (code >= 80 && code <= 82) return "SHOWERS";
-  if (code == 85 || code == 86) return "SNOW";
-  if (code >= 95 && code <= 99) return "STORM";
-  return "WEATHER";
 }
 
 int64_t daysFromCivil(int year, unsigned month, unsigned day) {
@@ -93,61 +79,107 @@ void seedClockFromApiTime(const char* local_iso_time, int32_t utc_offset) {
   settimeofday(&value, nullptr);
 }
 
-bool fetch(double latitude, double longitude) {
-  String url = config::kWeatherApiBase;
-  url += "?latitude=";
-  url += String(latitude, 6);
-  url += "&longitude=";
-  url += String(longitude, 6);
-  url +=
-      "&current=temperature_2m,relative_humidity_2m,weather_code,is_day"
-      "&temperature_unit=celsius&timezone=auto&forecast_days=1";
+String basicAuthHeader() {
+  char credentials[sizeof(config::kBrewfatherUserId) +
+                   sizeof(config::kBrewfatherApiKey) + 2] = {};
+  snprintf(credentials, sizeof(credentials), "%s:%s", config::kBrewfatherUserId,
+           config::kBrewfatherApiKey);
 
+  unsigned char encoded[sizeof(credentials) * 2] = {};
+  size_t encoded_len = 0;
+  const int result = mbedtls_base64_encode(
+      encoded, sizeof(encoded), &encoded_len,
+      reinterpret_cast<const unsigned char*>(credentials),
+      strlen(credentials));
+  if (result != 0) {
+    return String();
+  }
+
+  String header = "Basic ";
+  header.concat(reinterpret_cast<const char*>(encoded), encoded_len);
+  return header;
+}
+
+bool getJson(const String& url, const String& authorization, JsonDocument& doc) {
   WiFiClientSecure client;
   client.setInsecure();
 
   HTTPClient http;
   if (!http.begin(client, url)) {
-    Serial.println("weather: http.begin failed");
+    Serial.println("brewfather: http.begin failed");
     return false;
   }
-  http.setConnectTimeout(config::kWeatherRequestTimeoutMs);
-  http.setTimeout(config::kWeatherRequestTimeoutMs);
+  http.setConnectTimeout(config::kBrewfatherRequestTimeoutMs);
+  http.setTimeout(config::kBrewfatherRequestTimeoutMs);
+  http.addHeader("Authorization", authorization);
 
   const int code = http.GET();
   if (code != HTTP_CODE_OK) {
-    Serial.printf("weather: HTTP %d\n", code);
+    Serial.printf("brewfather: HTTP %d\n", code);
     http.end();
     return false;
   }
 
-  const String payload = http.getString();
+  const DeserializationError error = deserializeJson(doc, http.getStream());
   http.end();
-
-  JsonDocument doc;
-  const DeserializationError error = deserializeJson(doc, payload);
   if (error) {
-    Serial.printf("weather: JSON parse error: %s\n", error.c_str());
+    Serial.printf("brewfather: JSON parse error: %s\n", error.c_str());
+    return false;
+  }
+  return true;
+}
+
+bool fetch(double, double) {
+  if (config::kBrewfatherUserId[0] == '\0' ||
+      config::kBrewfatherApiKey[0] == '\0') {
+    Serial.println("brewfather: credentials are not configured");
     return false;
   }
 
-  JsonObject current = doc["current"].as<JsonObject>();
-  if (current.isNull() || !current["temperature_2m"].is<float>() ||
-      !current["relative_humidity_2m"].is<int>() ||
-      !current["weather_code"].is<int>()) {
-    Serial.println("weather: incomplete response");
+  const String authorization = basicAuthHeader();
+  if (authorization.isEmpty()) {
+    Serial.println("brewfather: could not create authorization header");
     return false;
   }
 
-  s_temperature_c = current["temperature_2m"].as<float>();
-  s_humidity_percent = current["relative_humidity_2m"].as<int>();
-  s_weather_code = current["weather_code"].as<int>();
-  s_utc_offset_seconds = doc["utc_offset_seconds"] | 0;
-  seedClockFromApiTime(current["time"] | nullptr, s_utc_offset_seconds);
+  JsonDocument batches;
+  String batches_url = config::kBrewfatherApiBase;
+  batches_url += "/batches?status=Fermenting&limit=50";
+  if (!getJson(batches_url, authorization, batches)) {
+    return false;
+  }
+
+  JsonArray batch_list = batches.as<JsonArray>();
+  if (batch_list.isNull() || batch_list.size() == 0 ||
+      !batch_list[0]["_id"].is<const char*>()) {
+    Serial.println("brewfather: no fermenting batch found");
+    return false;
+  }
+
+  const char* batch_id = batch_list[0]["_id"];
+  String reading_url = config::kBrewfatherApiBase;
+  reading_url += "/batches/";
+  reading_url += batch_id;
+  reading_url += "/readings/last";
+
+  JsonDocument reading;
+  if (!getJson(reading_url, authorization, reading)) {
+    return false;
+  }
+
+  if (!reading["temp"].is<float>()) {
+    Serial.println("brewfather: reading has no numeric temp field");
+    return false;
+  }
+
+  s_temperature_c = reading["temp"].as<float>();
+  s_fridge_temperature_c = reading["fridgeTemp"].is<float>()
+                               ? reading["fridgeTemp"].as<float>()
+                               : NAN;
   s_valid = true;
-  Serial.printf("weather: %.1f C, %d%%, code %d, UTC%+ld\n", s_temperature_c,
-                s_humidity_percent, s_weather_code,
-                static_cast<long>(s_utc_offset_seconds));
+  Serial.printf("brewfather: temp %.1f C, fridge %.1f C, sensor %s\n",
+                s_temperature_c, s_fridge_temperature_c,
+                reading["type"] | "unknown");
   return true;
 }
 
@@ -169,7 +201,7 @@ bool refreshIfDue(double latitude, double longitude, bool force) {
       fabs(latitude - s_last_latitude) > 0.0001 ||
       fabs(longitude - s_last_longitude) > 0.0001;
   if (!force && !location_changed && s_last_attempt_ms != 0 &&
-      now - s_last_attempt_ms < config::kWeatherFetchIntervalMs) {
+       now - s_last_attempt_ms < config::kBrewfatherFetchIntervalMs) {
     return false;
   }
   s_last_attempt_ms = now;
@@ -195,18 +227,25 @@ void formatWeatherLine(char* out, size_t out_len) {
     return;
   }
   if (!s_valid) {
-    snprintf(out, out_len, "WEATHER --");
+    snprintf(out, out_len, "BREW --");
     return;
   }
 
   float temperature = s_temperature_c;
-  const char unit =
-      settings::temperatureFahrenheit() ? 'F' : 'C';
+  float fridge_temperature = s_fridge_temperature_c;
+  const char unit = settings::temperatureFahrenheit() ? 'F' : 'C';
   if (settings::temperatureFahrenheit()) {
     temperature = temperature * 9.0f / 5.0f + 32.0f;
+    if (std::isfinite(fridge_temperature)) {
+      fridge_temperature = fridge_temperature * 9.0f / 5.0f + 32.0f;
+    }
   }
-  snprintf(out, out_len, "%s %.0f%c RH%d%%", conditionLabel(s_weather_code),
-           lroundf(temperature), unit, s_humidity_percent);
+  if (std::isfinite(fridge_temperature)) {
+    snprintf(out, out_len, "T %.1f%c F %.1f%c", temperature, unit,
+             fridge_temperature, unit);
+  } else {
+    snprintf(out, out_len, "T %.1f%c F --", temperature, unit);
+  }
 }
 
 void formatDateTimeLine(char* out, size_t out_len) {

@@ -16,6 +16,14 @@
 #define PLANE_RADAR_WIFI_FALLBACK_PASS ""
 #endif
 
+#ifndef BREWFATHER_USER_ID
+#define BREWFATHER_USER_ID ""
+#endif
+
+#ifndef BREWFATHER_API_KEY
+#define BREWFATHER_API_KEY ""
+#endif
+
 // --- Radar center defaults (ECHTE LIEBE ;-) ) 
 #ifndef PLANE_RADAR_DEFAULT_RADAR_LAT
 #define PLANE_RADAR_DEFAULT_RADAR_LAT 51.492605
@@ -89,10 +97,12 @@ constexpr unsigned long kFlightLookupFailureBackoffMs = 30000UL;
 constexpr unsigned long kFlightCacheSuccessMs = 6UL * 60UL * 60UL * 1000UL;
 constexpr unsigned long kFlightCacheMissMs = 10UL * 60UL * 1000UL;
 
-// --- Weather and local time ---
-constexpr char kWeatherApiBase[] = "https://api.open-meteo.com/v1/forecast";
-constexpr unsigned long kWeatherFetchIntervalMs = 15UL * 60UL * 1000UL;
-constexpr unsigned long kWeatherRequestTimeoutMs = 6000UL;
+// --- Brewfather and local time ---
+constexpr char kBrewfatherApiBase[] = "https://api.brewfather.app/v2";
+constexpr char kBrewfatherUserId[] = BREWFATHER_USER_ID;
+constexpr char kBrewfatherApiKey[] = BREWFATHER_API_KEY;
+constexpr unsigned long kBrewfatherFetchIntervalMs = 5UL * 60UL * 1000UL;
+constexpr unsigned long kBrewfatherRequestTimeoutMs = 6000UL;
 
 // --- User-facing defaults ---
 constexpr char kOtaUsername[] = "admin";
