@@ -29,6 +29,13 @@ float clampPercent(float value) {
   return std::max(0.0f, std::min(100.0f, value));
 }
 
+float platoFromSg(float specific_gravity) {
+  // Standard cubic approximation for SG values around normal wort gravity.
+  return -616.868f + 1111.14f * specific_gravity -
+         630.272f * specific_gravity * specific_gravity +
+         135.997f * specific_gravity * specific_gravity * specific_gravity;
+}
+
 void setSmooth(float size) {
   if (displayFontIsSmooth()) {
     displayFontSetSmoothSize(tft, size);
@@ -160,12 +167,13 @@ void brewDisplayDraw() {
   }
   drawCentered(attenuation, 45, kCream, 0.58f);
 
-  drawCentered("SG", 67, kWhite, 0.5f);
+  drawCentered("PLATO", 67, kWhite, 0.5f);
   char gravity[20] = {};
   if (data.specific_gravity > 0.0f) {
-    snprintf(gravity, sizeof(gravity), "%.3f", data.specific_gravity);
+    snprintf(gravity, sizeof(gravity), "%.1f P",
+             platoFromSg(data.specific_gravity));
   } else {
-    snprintf(gravity, sizeof(gravity), "-.---");
+    snprintf(gravity, sizeof(gravity), "--.- P");
   }
   drawCentered(gravity, 91, kCream, 1.48f);
   drawCentered(displayStatus(data.status), 113, kWhite, 0.52f);
