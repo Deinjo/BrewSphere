@@ -49,13 +49,13 @@ pio device monitor
 
 
 
-## Dependencies
+## Verwendete Bibliotheken
 
 - [LovyanGFX](https://github.com/lovyan03/LovyanGFX)
 - [WiFiManager](https://github.com/tzapu/WiFiManager)
 - [ArduinoJson](https://github.com/bblanchon/ArduinoJson)
 
-Runtime data services:
+Die Bibliotheken stehen jeweils unter ihren eigenen Lizenzbedingungen.
 
 
 ## Lizenz und Herkunft
