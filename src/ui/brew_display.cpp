@@ -25,6 +25,10 @@ constexpr uint16_t kCream = 0xFFB0;
 constexpr uint16_t kWhite = 0xFFFF;
 constexpr uint16_t kMuted = 0x9D9F;
 
+LGFX_Sprite s_frame(&tft);
+bool s_frame_ready = false;
+lgfx::LGFXBase* s_draw = &tft;
+
 float clampPercent(float value) {
   return std::max(0.0f, std::min(100.0f, value));
 }
@@ -38,17 +42,17 @@ float platoFromSg(float specific_gravity) {
 
 void setSmooth(float size) {
   if (displayFontIsSmooth()) {
-    displayFontSetSmoothSize(tft, size);
+    displayFontSetSmoothSize(*s_draw, size);
   } else {
-    displayFontSetBitmap(tft, &lgfx::v1::fonts::FreeSansBold12pt7b);
+    displayFontSetBitmap(*s_draw, &lgfx::v1::fonts::FreeSansBold12pt7b);
   }
 }
 
 void drawCentered(const char* text, int y, uint16_t color, float size) {
   setSmooth(size);
-  tft.setTextDatum(textdatum_t::middle_center);
-  tft.setTextColor(color, kBackground);
-  tft.drawString(text, kCenterX, y);
+  s_draw->setTextDatum(textdatum_t::middle_center);
+  s_draw->setTextColor(color, kBackground);
+  s_draw->drawString(text, kCenterX, y);
 }
 
 void drawGaugeRing(float attenuation) {
@@ -65,8 +69,8 @@ void drawGaugeRing(float attenuation) {
     const int x = kCenterX + static_cast<int>(std::lround(std::cos(angle) * radius));
     const int y = kCenterY + static_cast<int>(std::lround(std::sin(angle) * radius));
     const bool active = ratio <= progress;
-    tft.fillCircle(x, y, active ? 3 : 2, active ? (ratio < 0.72f ? kBlue : kCyan)
-                                                   : 0x31B6);
+    s_draw->fillCircle(x, y, active ? 3 : 2,
+                       active ? (ratio < 0.72f ? kBlue : kCyan) : 0x31B6);
   }
 }
 
@@ -76,7 +80,7 @@ void drawGaugeTicks() {
     const float angle = (140.0f + i * 26.0f) * kDegToRad;
     const int x = kCenterX + static_cast<int>(std::lround(std::cos(angle) * 94));
     const int y = kCenterY + static_cast<int>(std::lround(std::sin(angle) * 94));
-    tft.fillCircle(x, y, 1, kCream);
+    s_draw->fillCircle(x, y, 1, kCream);
   }
 }
 
@@ -85,14 +89,14 @@ void fitText(char* output, size_t output_len, const char* input, int max_width) 
     return;
   }
   snprintf(output, output_len, "%s", input != nullptr ? input : "");
-  if (tft.textWidth(output) <= max_width) {
+  if (s_draw->textWidth(output) <= max_width) {
     return;
   }
 
   const size_t input_len = strlen(output);
   for (size_t length = input_len; length > 0; --length) {
     snprintf(output, output_len, "%.*s...", static_cast<int>(length), input);
-    if (tft.textWidth(output) <= max_width) {
+    if (s_draw->textWidth(output) <= max_width) {
       return;
     }
   }
@@ -116,8 +120,8 @@ const char* displayStatus(const char* status) {
 }
 
 void drawBatchPanel(const services::weather::BrewData& data) {
-  tft.fillRoundRect(35, 168, 170, 48, 8, kPanel);
-  tft.drawRoundRect(35, 168, 170, 48, 8, kPanelEdge);
+  s_draw->fillRoundRect(35, 168, 170, 48, 8, kPanel);
+  s_draw->drawRoundRect(35, 168, 170, 48, 8, kPanelEdge);
 
   char batch[80] = {};
   if (data.batch_number > 0) {
@@ -130,17 +134,17 @@ void drawBatchPanel(const services::weather::BrewData& data) {
   setSmooth(0.52f);
   char fitted_batch[48] = {};
   fitText(fitted_batch, sizeof(fitted_batch), batch, 150);
-  tft.setTextDatum(textdatum_t::middle_center);
-  tft.setTextColor(kWhite, kPanel);
-  tft.drawString(fitted_batch, kCenterX, 183);
+  s_draw->setTextDatum(textdatum_t::middle_center);
+  s_draw->setTextColor(kWhite, kPanel);
+  s_draw->drawString(fitted_batch, kCenterX, 183);
 
   const char* recipe = data.recipe_name[0] != '\0' ? data.recipe_name : data.status;
   setSmooth(0.42f);
   char fitted_recipe[48] = {};
   fitText(fitted_recipe, sizeof(fitted_recipe), recipe, 150);
-  tft.setTextColor(kMuted, kPanel);
-  tft.drawString(fitted_recipe[0] != '\0' ? fitted_recipe : "BREWFATHER",
-                 kCenterX, 202);
+  s_draw->setTextColor(kMuted, kPanel);
+  s_draw->drawString(fitted_recipe[0] != '\0' ? fitted_recipe : "BREWFATHER",
+                     kCenterX, 202);
 }
 
 }  // namespace
@@ -149,10 +153,17 @@ namespace ui {
 
 void brewDisplayDraw() {
   const services::weather::BrewData& data = services::weather::data();
-  tft.fillScreen(kBackground);
-  tft.fillCircle(kCenterX, kCenterY, 116, kBackground);
-  tft.drawCircle(kCenterX, kCenterY, 116, 0x39D7);
-  tft.drawCircle(kCenterX, kCenterY, 112, 0x12B4);
+  if (!s_frame_ready) {
+    s_frame.setColorDepth(16);
+    s_frame.createSprite(240, 240);
+    s_frame_ready = true;
+  }
+  s_draw = &s_frame;
+
+  s_draw->fillScreen(kBackground);
+  s_draw->fillCircle(kCenterX, kCenterY, 116, kBackground);
+  s_draw->drawCircle(kCenterX, kCenterY, 116, 0x39D7);
+  s_draw->drawCircle(kCenterX, kCenterY, 112, 0x12B4);
 
   drawGaugeRing(data.measured_attenuation_percent);
   drawGaugeTicks();
@@ -201,6 +212,9 @@ void brewDisplayDraw() {
     snprintf(day, sizeof(day), "TAG --");
   }
   drawCentered(day, 229, kWhite, 0.52f);
+
+  s_frame.pushSprite(0, 0);
+  s_draw = &tft;
 }
 
 void brewDisplayRefresh() { brewDisplayDraw(); }
@@ -237,7 +251,7 @@ void brewDisplayWriteBmp(Print& output) {
   uint8_t row[kRowSize];
   for (int y = kBmpHeight - 1; y >= 0; --y) {
     for (int x = 0; x < kBmpWidth; ++x) {
-      uint16_t pixel = tft.readPixel(x, y);
+      const uint16_t pixel = s_frame_ready ? s_frame.readPixel(x, y) : 0;
       uint8_t red = static_cast<uint8_t>((pixel >> 11) & 0x1F);
       const uint8_t green = static_cast<uint8_t>((pixel >> 5) & 0x3F);
       uint8_t blue = static_cast<uint8_t>(pixel & 0x1F);
