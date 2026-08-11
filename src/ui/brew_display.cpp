@@ -38,10 +38,10 @@ constexpr uint16_t kBatchLabel = displayColor(0x7B, 0x96, 0xA8); // #7b96a8
 constexpr uint16_t kBatchValue = displayColor(0xF0, 0xF4, 0xF6); // #f0f4f6
 constexpr uint16_t kRecipe = displayColor(0xD5, 0xE0, 0xE7);     // #d5e0e7
 
-static_assert(kBackground == (config::kDisplayRgbOrder ? 0x51A1 : 0x09A9));
+static_assert(kBackground == (config::kDisplayRgbOrder ? 0x51A1 : 0x09AA));
 static_assert(kBlue == (config::kDisplayRgbOrder ? 0xDC07 : 0x3C1B));
-static_assert(kCyan == (config::kDisplayRgbOrder ? 0xDEC8 : 0x46DB));
-static_assert(kCream == (config::kDisplayRgbOrder ? 0x973F : 0xFF13));
+static_assert(kCyan == (config::kDisplayRgbOrder ? 0xDEE8 : 0x46FB));
+static_assert(kCream == (config::kDisplayRgbOrder ? 0x9F1F : 0xFF13));
 
 LGFX_Sprite s_frame(&tft);
 bool s_frame_ready = false;
@@ -81,7 +81,7 @@ void drawFixedTemperature(const char* label, const char* value, int label_x,
   s_draw->drawString(label, label_x, y);
   s_draw->setTextDatum(textdatum_t::middle_right);
   s_draw->drawString(value, value_x, y);
-  s_draw->drawString("\xC2\xB0C", unit_x, y);
+  s_draw->drawString("\xC2\xB0" "C", unit_x, y);
 }
 
 void drawArcSegment(float start_deg, float end_deg, int radius, float width,
