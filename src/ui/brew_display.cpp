@@ -168,15 +168,33 @@ void drawInfoPanels() {
   s_draw->fillTriangle(34, 195, 183, 177, 206, 195, kPanel);
   s_draw->fillTriangle(34, 195, 206, 195, 177, 216, kPanel);
   s_draw->fillTriangle(34, 195, 177, 216, 63, 216, kPanel);
+  constexpr float panel_radius = 116.0f;
+  constexpr float panel_center_y = 117.0f;
+  for (int y = 195; y <= 233; ++y) {
+    const float dy = static_cast<float>(y) - panel_center_y;
+    const int half_width = static_cast<int>(std::lround(
+        std::sqrt(panel_radius * panel_radius - dy * dy)));
+    s_draw->drawWideLine(120 - half_width, y, 120 + half_width, y, 1.0f,
+                         kPanel);
+  }
   s_draw->drawWideLine(57, 177, 64, 174, 1.0f, kPanelEdge);
   s_draw->drawWideLine(64, 174, 176, 174, 1.0f, kPanelEdge);
   s_draw->drawWideLine(176, 174, 183, 177, 1.0f, kPanelEdge);
-  s_draw->drawWideLine(57, 177, 183, 177, 1.0f, kPanelEdge);
   s_draw->drawWideLine(34, 195, 57, 177, 1.0f, kPanelEdge);
   s_draw->drawWideLine(183, 177, 206, 195, 1.0f, kPanelEdge);
-  s_draw->drawWideLine(34, 195, 63, 216, 1.0f, kPanelEdge);
-  s_draw->drawWideLine(63, 216, 177, 216, 1.0f, kPanelEdge);
-  s_draw->drawWideLine(177, 216, 206, 195, 1.0f, kPanelEdge);
+  constexpr float kDegToRad = 0.01745329252f;
+  int previous_x = 34;
+  int previous_y = 195;
+  for (int i = 1; i <= 32; ++i) {
+    const float angle = (138.7f - (97.4f * i / 32.0f)) * kDegToRad;
+    const int x = 120 + static_cast<int>(std::lround(std::cos(angle) * panel_radius));
+    const int y = static_cast<int>(std::lround(
+        panel_center_y + std::sin(angle) * panel_radius));
+    s_draw->drawWideLine(previous_x, previous_y, x, y, 1.0f, kPanelEdge);
+    previous_x = x;
+    previous_y = y;
+  }
+  s_draw->drawWideLine(62, 212, 178, 212, 1.0f, kPanelEdge);
 }
 
 void drawBatchPanel(const services::weather::BrewData& data) {
