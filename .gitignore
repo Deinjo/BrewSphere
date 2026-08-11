@@ -25,3 +25,4 @@ __pycache__/
 /tools/TestingBrewfatherApi/config_local.py
 /tools/TestingBrewfatherApi/brewfather_response*.json
 /tools/TestingBrewfatherApi/brewfather_response*.html
+/tools/BrewSphereMockup/config_local.py

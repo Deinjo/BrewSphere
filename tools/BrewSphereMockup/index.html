@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BrewSphere Mockup</title>
+  <style>
+    :root { --bg:#eef2f5; --surface:#fff; --line:#c9d3dc; --ink:#152331; --muted:#5c7182; --blue:#1e467d; --danger:#a63f3b; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; overflow-x:hidden; background:var(--bg); color:var(--ink); font:15px/1.4 Arial,sans-serif; }
+    header { background:#fff; border-bottom:1px solid var(--line); padding:18px 24px; }
+    header h1 { color:var(--blue); font-size:21px; margin:0 0 3px; }
+    header p { color:var(--muted); margin:0; }
+    main { display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1fr) minmax(0, 2fr); grid-template-rows:minmax(0, 1fr); gap:20px; width:100%; max-width:none; height:calc(100vh - 86px); margin:20px 0; padding:0 20px; align-items:stretch; }
+    .preview { position:relative; grid-column:2; grid-row:1; display:flex; flex-direction:column; justify-content:center; gap:14px; min-width:0; overflow:auto; background:#dfe6eb; border:1px solid var(--line); border-radius:12px; padding:22px; }
+    .display-frame, .reference-frame { position:relative; display:grid; place-items:center; width:100%; min-height:0; }
+    .reference-frame { border-top:1px solid #b8c6d0; padding-top:14px; }
+    .reference-frame img { display:block; width:min(100%, 480px); aspect-ratio:1; object-fit:contain; background:#fff; box-shadow:0 8px 18px #17334a22; }
+    .reference-empty { color:var(--muted); font-size:13px; text-align:center; }
+    .preview svg text { font-family:"Noto Sans", Arial, sans-serif; }
+    svg { display:block; width:min(100%, 480px); height:auto; aspect-ratio:1; border-radius:50%; box-shadow:0 12px 28px #17334a30; }
+    .coordinates { position:absolute; top:10px; left:10px; pointer-events:none; border:1px solid #7890a1; border-radius:4px; padding:4px 7px; background:#fffdfed9; color:#25445c; font:12px Consolas,monospace; }
+    .controls { grid-column:1; grid-row:1; overflow:auto; background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:20px; box-shadow:0 8px 24px #12304712; }
+    h2 { color:var(--blue); font-size:17px; margin:0 0 16px; }
+    .mode { display:flex; gap:8px; margin-bottom:18px; }
+    button { border:1px solid #7992a7; border-radius:6px; background:#fff; color:var(--ink); cursor:pointer; font:inherit; padding:8px 12px; }
+    button.active, button.primary { background:var(--blue); border-color:var(--blue); color:#fff; }
+    button:hover { filter:brightness(1.08); }
+    .field { margin:13px 0; }
+    .field label { display:flex; justify-content:space-between; color:var(--muted); margin-bottom:5px; }
+    input[type=range] { accent-color:var(--blue); width:100%; }
+    input[type=text], input[type=number] { width:100%; border:1px solid var(--line); border-radius:5px; padding:8px; color:var(--ink); background:#fbfcfd; }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .status { border-left:3px solid #4f7d63; background:#eef6f0; color:#31523e; padding:9px 11px; margin-top:17px; }
+    .status.error { border-color:var(--danger); background:#fff1f0; color:#7b2824; }
+    .hint { color:var(--muted); font-size:13px; margin:12px 0 0; }
+    .editor { grid-column:3; grid-row:1; display:flex; flex-direction:column; min-width:0; min-height:0; background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:20px; box-shadow:0 8px 24px #12304712; }
+    .code-editor { position:relative; flex:1; min-height:0; overflow:hidden; border:1px solid var(--line); border-radius:6px; background:#101923; }
+    .code-editor pre, .code-editor textarea { position:absolute; inset:0; margin:0; padding:12px; border:0; white-space:pre; overflow:auto; tab-size:2; font:12px/1.45 Consolas,monospace; }
+    .code-editor pre { pointer-events:none; color:#d8e7f0; }
+    .code-editor textarea { width:100%; height:100%; resize:none; outline:none; background:transparent; color:transparent; caret-color:#fff; -webkit-text-fill-color:transparent; }
+    .code-editor .tag { color:#70b7ff; }
+    .code-editor .comment { color:#6f8a75; }
+    .editor-actions { display:flex; gap:8px; margin-top:10px; }
+    @media (max-width:1100px) {
+      main { grid-template-columns:minmax(300px, 1fr) minmax(280px, 420px); height:auto; }
+      .editor { grid-column:1; grid-row:1; min-height:calc(100vh - 126px); }
+      .preview { grid-column:2; grid-row:1; }
+      .controls { grid-column:1 / -1; grid-row:2; }
+    }
+    @media (max-width:760px) {
+      main { display:flex; flex-direction:column; height:auto; margin-top:16px; }
+      .editor, .preview, .controls { width:100%; }
+      .editor { min-height:520px; order:3; }
+      .preview { min-height:320px; order:1; padding:12px; }
+      .controls { order:2; overflow:visible; }
+    }
+  </style>
+</head>
+<body>
+  <header><h1>BrewSphere Display Mockup</h1><p>240 × 240 Zielansicht ohne angeschlossene Hardware</p></header>
+  <main>
+    <section class="preview" aria-label="BrewSphere Display">
+      <div class="display-frame">
+      <div id="displayCoordinates" class="coordinates">x: ---, y: ---</div>
+      <svg id="displaySvg" viewBox="0 0 240 240" role="img" aria-labelledby="display-title">
+        <title id="display-title">BrewSphere Gärungsanzeige</title>
+        <rect width="240" height="240" fill="#0b3552"/>
+        <circle cx="120" cy="120" r="116" fill="#0b3552" stroke="#123f63" stroke-width="8"/>
+        <path d="M38 184 A104 104 0 0 1 52 48" fill="none" stroke="#3d83df" stroke-width="6" stroke-linecap="round"/>
+        <path d="M52 48 A104 104 0 0 1 171 26" fill="none" stroke="#3d83df" stroke-width="6" stroke-linecap="round"/>
+        <path d="M171 26 A104 104 0 0 1 201 64" fill="none" stroke="#41dede" stroke-width="6" stroke-linecap="round"/>
+        <path d="M201 64 A104 104 0 0 1 211 155" fill="none" stroke="#ffe39b" stroke-width="4" stroke-linecap="round"/>
+        <g id="dots" fill="#ffe39b"></g>
+        <text x="120" y="49" text-anchor="middle" fill="#ffe39b" font-size="8" letter-spacing=".4">ATTENUATION <tspan id="attenuationText">81</tspan>%</text>
+        <path d="M85 67h20 M135 67h20" stroke="#9bb1c2" stroke-width="1"/>
+        <text x="120" y="70" text-anchor="middle" fill="#e8f0f5" font-size="12">PLATO</text>
+        <text id="platoText" x="120" y="105" text-anchor="middle" fill="#fff1c9" font-size="35" font-weight="bold">36.4 P</text>
+        <text id="targetText" x="120" y="119" text-anchor="middle" fill="#9bb1c2" font-size="6">ZIEL 2.7 P</text>
+        <text id="statusText" x="120" y="135" text-anchor="middle" fill="#fff1c9" font-size="13">GAERUNG</text>
+        <text x="37" y="157" text-anchor="start" fill="#41dede" font-size="15">S:</text>
+        <text id="tempTargetText" x="105" y="157" text-anchor="end" fill="#41dede" font-size="15">3.0</text>
+        <text x="113" y="157" text-anchor="end" fill="#41dede" font-size="15">°C</text>
+        <text x="140" y="157" text-anchor="start" fill="#41dede" font-size="15">I:</text>
+        <text id="fridgeText" x="185" y="157" text-anchor="end" fill="#41dede" font-size="15">3.4</text>
+        <text x="203" y="157" text-anchor="end" fill="#41dede" font-size="15">°C</text>
+        <path d="M34 177 L207 177 L177 216 L63 216 Z" fill="#173f5d" stroke="#62869d" stroke-width="1"/>
+        <text id="batchText" x="120" y="190" text-anchor="middle" fill="#f0f4f6" font-size="8">BATCH #39 Sud</text>
+        <text id="recipeText" x="120" y="202" text-anchor="middle" fill="#d5e0e7" font-size="7">Erdbeer-Woelkchen</text>
+        <text id="dayText" x="120" y="229" text-anchor="middle" fill="#d5e0e7" font-size="8">TAG 13</text>
+      </svg>
+      </div>
+      <div class="reference-frame">
+        <div id="referenceCoordinates" class="coordinates">x: ---, y: ---</div>
+        <div id="referenceEmpty" class="reference-empty">Noch kein PNG geladen</div>
+        <img id="referencePreview" alt="PNG-Referenz" hidden>
+      </div>
+    </section>
+    <section class="controls">
+      <h2>Datenquelle</h2>
+      <div class="mode"><button id="mockMode" class="active">Mockwerte</button><button id="apiMode">Brewfather API</button></div>
+      <div id="mockControls">
+        <div class="field"><label for="plato"><span>Aktueller Plato</span><output id="platoValue">36.4 °P</output></label><input id="plato" type="range" min="0" max="40" step="0.1" value="36.4"></div>
+        <div class="field"><label for="target"><span>Ziel-Plato</span><output id="targetValue">2.7 °P</output></label><input id="target" type="range" min="0" max="20" step="0.1" value="2.7"></div>
+        <div class="field"><label for="attenuation"><span>Aktueller Vergärgrad</span><output id="attenuationValue">81 %</output></label><input id="attenuation" type="range" min="0" max="100" step="1" value="81"></div>
+        <div class="field"><label for="endAttenuation"><span>Endvergärgrad / Farbwechsel</span><output id="endAttenuationValue">84 %</output></label><input id="endAttenuation" type="range" min="0" max="100" step="1" value="84"></div>
+        <div class="grid"><div class="field"><label for="tempTarget">Solltemperatur (°C)</label><input id="tempTarget" type="number" step="0.1" value="3.0"></div><div class="field"><label for="fridge">Fridge (°C)</label><input id="fridge" type="number" step="0.1" value="3.4"></div></div>
+        <div class="grid"><div class="field"><label for="batch">Batch</label><input id="batch" type="text" value="#39 Sud"></div><div class="field"><label for="day">Gärtag</label><input id="day" type="number" value="13"></div></div>
+        <div class="field"><label for="recipe">Rezept</label><input id="recipe" type="text" value="Erdbeer-Woelkchen"></div>
+      </div>
+      <button id="refreshApi" class="primary" hidden>API-Daten laden</button>
+      <p id="status" class="status">Mockwerte aktiv. Änderungen werden sofort dargestellt.</p>
+      <p class="hint">Der API-Modus verwendet den lokalen Python-Proxy. Der Brewfather-Key bleibt dabei außerhalb des Browsers.</p>
+    </section>
+    <section class="editor">
+      <h2>SVG-Editor</h2>
+      <div class="code-editor">
+        <pre id="svgHighlight" aria-hidden="true"><code></code></pre>
+        <textarea id="svgEditor" spellcheck="false" aria-label="Aktueller SVG-Code"></textarea>
+      </div>
+      <div class="editor-actions">
+        <button id="applySvg" class="primary">SVG anwenden</button>
+        <button id="syncSvg">Aktuellen SVG-Code laden</button>
+        <button id="saveSvg">SVG speichern</button>
+        <button id="loadSvg">SVG laden</button>
+        <input id="svgFile" type="file" accept="image/svg+xml,.svg" hidden>
+      </div>
+      <div class="editor-actions">
+        <button id="loadReference">PNG als Referenz laden</button>
+        <button id="removeReference">Referenz entfernen</button>
+        <input id="referenceFile" type="file" accept="image/png,image/jpeg,.png,.jpg,.jpeg" hidden>
+      </div>
+      <p class="hint">Der Code kann direkt bearbeitet werden. Für dynamische Mockwerte sollten die IDs wie <code>platoText</code>, <code>tempTargetText</code> und <code>batchText</code> erhalten bleiben.</p>
+    </section>
+  </main>
+  <script>
+    const $ = id => document.getElementById(id);
+    const ids = ['plato','target','attenuation','endAttenuation','tempTarget','fridge','batch','day','recipe'];
+    const state = { plato:36.4, target:2.7, attenuation:81, tempTarget:3.0, fridge:3.4, batch:'#39 Sud', day:13, recipe:'Erdbeer-Woelkchen' };
+    const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+    const setText = (id, value) => { const element = $(id); if (element) element.textContent = value; };
+    function makeDots() {
+      const scale = $('03_scale_dots');
+      const svg = document.querySelector('.preview svg');
+      if (!scale || !svg) return;
+      const definitionDots = svg.querySelector('#dots');
+      if (definitionDots) definitionDots.replaceChildren();
+      const oldGenerated = svg.querySelector('#mockupGeneratedDots');
+      if (oldGenerated) oldGenerated.remove();
+      const radius = Number(scale?.dataset.radius || 100);
+      const startAngle = Number(scale?.dataset.startAngle || 145);
+      const endAngle = Number(scale?.dataset.endAngle || 395);
+      const stepPercent = Number(scale?.dataset.stepPercent || 2.5);
+      const majorStepPercent = Number(scale?.dataset.majorStepPercent || 10);
+      const smallRadius = Number(scale?.dataset.smallRadius || 1.6);
+      const majorRadius = Number(scale?.dataset.majorRadius || smallRadius + 1);
+      const count = Math.round(100 / stepPercent) + 1;
+      const leftColor = scale?.dataset.leftColor || '#3d83df';
+      const rightColor = scale?.dataset.rightColor || '#ffe39b';
+      const colorBreakPercent = Number(scale?.dataset.colorBreakPercent || 84);
+      const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      group.setAttribute('id', 'mockupGeneratedDots');
+      group.setAttribute('data-generated', 'true');
+      scale.parentNode.appendChild(group);
+      for (let i=0; i<count; i++) {
+        const ratio = i / (count - 1), angle = (startAngle + (endAngle - startAngle) * ratio) * Math.PI / 180;
+        const x = 120 + Math.cos(angle) * radius, y = 120 + Math.sin(angle) * radius;
+        const dot = document.createElementNS('http://www.w3.org/2000/svg','circle');
+        const percent = i * stepPercent;
+        const isMajor = Math.abs(percent % majorStepPercent) < 0.001;
+        dot.setAttribute('cx', x); dot.setAttribute('cy', y); dot.setAttribute('r', isMajor ? majorRadius : smallRadius);
+        dot.setAttribute('fill', percent < colorBreakPercent ? leftColor : rightColor); group.appendChild(dot);
+      }
+    }
+    function updateCoordinates(event, elementId, outputId) {
+      const element = $(elementId);
+      if (!element) return;
+      const rect = element.getBoundingClientRect();
+      const x = clamp(Math.round((event.clientX - rect.left) * 240 / rect.width), 0, 239);
+      const y = clamp(Math.round((event.clientY - rect.top) * 240 / rect.height), 0, 239);
+      $(outputId).textContent = `x: ${String(x).padStart(3, ' ')}, y: ${String(y).padStart(3, ' ')}`;
+    }
+    function update() {
+      state.plato = Number($('plato').value); state.target = Number($('target').value); state.attenuation = Number($('attenuation').value);
+      const endAttenuation = Number($('endAttenuation').value);
+      state.tempTarget = Number($('tempTarget').value); state.fridge = Number($('fridge').value); state.batch = $('batch').value; state.day = Number($('day').value); state.recipe = $('recipe').value;
+      $('platoValue').value = `${state.plato.toFixed(1)} °P`; $('targetValue').value = `${state.target.toFixed(1)} °P`; $('attenuationValue').value = `${state.attenuation.toFixed(0)} %`; $('endAttenuationValue').value = `${endAttenuation.toFixed(0)} %`;
+      setText('platoText', `${state.plato.toFixed(1)} °P`); setText('targetText', `ZIEL ${state.target.toFixed(1)} °P`); setText('attenuationText', state.attenuation.toFixed(0));
+      setText('tempTargetText', state.tempTarget.toFixed(1)); setText('fridgeText', state.fridge.toFixed(1)); if ($('batchValue')) setText('batchValue', ` ${state.batch || '-'}`); else setText('batchText', `BATCH: ${state.batch || '-'}`); setText('recipeText', state.recipe || '-'); if ($('dayValue')) setText('dayValue', ` ${state.day || '--'}`); else setText('dayText', `TAG: ${state.day || '--'}`);
+      const scale = $('03_scale_dots');
+      if (scale) scale.dataset.colorBreakPercent = endAttenuation;
+      makeDots();
+      updateAttenuationArc(state.attenuation);
+    }
+    function updateAttenuationArc(value) {
+      const path = document.querySelector('.preview svg #attenuationProgress');
+      if (!path) return;
+      const ratio = clamp(Number(value) / 100, 0, 1);
+      if (ratio <= 0) { path.setAttribute('display', 'none'); return; }
+      path.removeAttribute('display');
+      const start = 145 * Math.PI / 180;
+      const end = (145 + 250 * ratio) * Math.PI / 180;
+      const radius = 110;
+      const x1 = 120 + Math.cos(start) * radius;
+      const y1 = 120 + Math.sin(start) * radius;
+      const x2 = 120 + Math.cos(end) * radius;
+      const y2 = 120 + Math.sin(end) * radius;
+      const largeArc = ratio * 250 > 180 ? 1 : 0;
+      path.setAttribute('d', `M ${x1.toFixed(1)} ${y1.toFixed(1)} A ${radius} ${radius} 0 ${largeArc} 1 ${x2.toFixed(1)} ${y2.toFixed(1)}`);
+    }
+    function syncSvg() {
+      const svg = document.querySelector('.preview svg').cloneNode(true);
+      const generatedDots = svg.querySelector('#mockupGeneratedDots');
+      if (generatedDots) generatedDots.remove();
+      $('svgEditor').value = new XMLSerializer().serializeToString(svg);
+      highlightSvg();
+    }
+    function highlightSvg() {
+      const escaped = $('svgEditor').value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const highlighted = escaped
+        .replace(/(&lt;!--[\s\S]*?--&gt;)/g, '<span class="comment">$1</span>')
+        .replace(/(&lt;\/?[a-zA-Z][^&]*?&gt;)/g, '<span class="tag">$1</span>');
+      $('svgHighlight').querySelector('code').innerHTML = highlighted || ' ';
+    }
+    function syncEditorScroll() {
+      $('svgHighlight').scrollTop = $('svgEditor').scrollTop;
+      $('svgHighlight').scrollLeft = $('svgEditor').scrollLeft;
+    }
+    function setSvg(source, message) {
+      source = source.trim();
+      if (!source.startsWith('<svg')) {
+        $('status').className = 'status error'; $('status').textContent = 'SVG-Fehler: Der Code muss mit <svg beginnen.'; return;
+      }
+      const parsed = new DOMParser().parseFromString(source, 'image/svg+xml');
+      if (parsed.querySelector('parsererror') || !parsed.documentElement || parsed.documentElement.tagName.toLowerCase() !== 'svg') {
+        $('status').className = 'status error'; $('status').textContent = 'SVG-Fehler: Der Code konnte nicht gelesen werden.'; return;
+      }
+      const preview = document.querySelector('.preview');
+      const currentSvg = preview.querySelector('svg');
+      if (currentSvg) currentSvg.remove();
+      const importedSvg = document.importNode(parsed.documentElement, true);
+      if (!importedSvg.id) importedSvg.id = 'displaySvg';
+      preview.querySelector('.display-frame').appendChild(importedSvg);
+      makeDots(); update();
+       syncSvg(); $('status').className = 'status'; $('status').textContent = message;
+    }
+    function applySvg() { setSvg($('svgEditor').value.trim(), 'SVG angewendet. Mockwerte bleiben aktiv.'); }
+    function saveSvg() {
+      syncSvg();
+      const blob = new Blob([$('svgEditor').value], {type:'image/svg+xml;charset=utf-8'});
+      const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'brewsphere-display.svg'; link.click(); URL.revokeObjectURL(link.href);
+    }
+    function updateReferenceOpacity() {
+      const reference = document.querySelector('.preview svg #referenceImage');
+      if (reference) reference.setAttribute('opacity', $('referenceOpacity').value);
+    }
+    function loadReferenceFile(file) {
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const svg = document.querySelector('.preview svg');
+        if (!svg) return;
+        $('referencePreview').src = String(reader.result); $('referencePreview').hidden = false; $('referenceEmpty').hidden = true;
+        $('status').className='status'; $('status').textContent=`Referenz geladen: ${file.name}`;
+      };
+      reader.readAsDataURL(file);
+    }
+    function removeReference() {
+      $('referencePreview').removeAttribute('src'); $('referencePreview').hidden = true; $('referenceEmpty').hidden = false; $('status').textContent='Referenz entfernt.';
+    }
+    function loadSvgFile(file) {
+      if (!file) return;
+      const reader = new FileReader(); reader.onload = () => setSvg(String(reader.result), `SVG geladen: ${file.name}`); reader.onerror = () => { $('status').className='status error'; $('status').textContent='SVG-Datei konnte nicht gelesen werden.'; }; reader.readAsText(file);
+    }
+    async function loadDefaultSvg() {
+      try { const response = await fetch('/default.svg', {cache:'no-store'}); if (!response.ok) throw new Error('default.svg nicht gefunden'); setSvg(await response.text(), 'Default-SVG geladen.'); }
+      catch (error) { makeDots(); update(); syncSvg(); $('status').className='status error'; $('status').textContent=`Default-SVG konnte nicht geladen werden: ${error.message}`; }
+    }
+    async function loadApi() {
+      $('status').className = 'status'; $('status').textContent = 'Brewfather-Daten werden geladen...';
+      try { const response = await fetch('/api/brewfather'); if (!response.ok) throw new Error(await response.text()); const data = await response.json();
+        $('plato').value = data.plato; $('target').value = data.target_plato; $('attenuation').value = data.attenuation; $('endAttenuation').value = data.end_attenuation; $('tempTarget').value = data.target_temperature; $('fridge').value = data.fridge_temperature; $('batch').value = `#${data.batch_number} ${data.batch_name}`; $('day').value = data.brew_day; $('recipe').value = data.recipe_name || data.status; update(); $('status').textContent = `API aktiv: ${data.batch_name}`;
+      } catch (error) { $('status').className = 'status error'; $('status').textContent = `API-Fehler: ${error.message}`; }
+    }
+    ids.forEach(id => $(id).addEventListener('input', update));
+    $('mockMode').addEventListener('click', () => { $('mockMode').classList.add('active'); $('apiMode').classList.remove('active'); $('mockControls').hidden=false; $('refreshApi').hidden=true; $('status').className='status'; $('status').textContent='Mockwerte aktiv. Änderungen werden sofort dargestellt.'; });
+    $('apiMode').addEventListener('click', () => { $('apiMode').classList.add('active'); $('mockMode').classList.remove('active'); $('mockControls').hidden=true; $('refreshApi').hidden=false; loadApi(); });
+    $('refreshApi').addEventListener('click', loadApi);
+    $('syncSvg').addEventListener('click', syncSvg); $('applySvg').addEventListener('click', applySvg); $('saveSvg').addEventListener('click', saveSvg);
+    $('svgEditor').addEventListener('input', highlightSvg); $('svgEditor').addEventListener('scroll', syncEditorScroll);
+    $('loadSvg').addEventListener('click', () => $('svgFile').click()); $('svgFile').addEventListener('change', event => loadSvgFile(event.target.files[0]));
+    $('loadReference').addEventListener('click', () => $('referenceFile').click()); $('referenceFile').addEventListener('change', event => loadReferenceFile(event.target.files[0]));
+    $('removeReference').addEventListener('click', removeReference);
+    document.querySelector('.display-frame').addEventListener('pointermove', event => updateCoordinates(event, 'displaySvg', 'displayCoordinates'));
+    document.querySelector('.reference-frame').addEventListener('pointermove', event => updateCoordinates(event, 'referencePreview', 'referenceCoordinates'));
+    document.querySelector('.display-frame').addEventListener('pointerleave', () => { $('displayCoordinates').textContent = 'x: ---, y: ---'; });
+    document.querySelector('.reference-frame').addEventListener('pointerleave', () => { $('referenceCoordinates').textContent = 'x: ---, y: ---'; });
+    loadDefaultSvg();
+  </script>
+</body>
+</html>
