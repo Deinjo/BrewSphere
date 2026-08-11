@@ -19,11 +19,10 @@ constexpr int kCenterY = 120;
 
 // LovyanGFX swaps red and blue for this panel when rgb_order is enabled.
 constexpr uint16_t displayColor(uint8_t red, uint8_t green, uint8_t blue) {
-  const uint8_t panel_red = config::kDisplayRgbOrder ? blue : red;
-  const uint8_t panel_blue = config::kDisplayRgbOrder ? red : blue;
-  return static_cast<uint16_t>(((panel_red & 0xF8u) << 8) |
-                               ((green & 0xFCu) << 3) |
-                               (panel_blue >> 3));
+  return static_cast<uint16_t>(
+      ((((config::kDisplayRgbOrder ? blue : red) & 0xF8u) << 8) |
+       ((green & 0xFCu) << 3) |
+       ((config::kDisplayRgbOrder ? red : blue) >> 3)));
 }
 
 constexpr uint16_t kBackground = displayColor(0x0B, 0x35, 0x52);  // #0b3552
