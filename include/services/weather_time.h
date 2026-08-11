@@ -16,6 +16,7 @@ struct BrewData {
   int batch_number = 0;
   int brew_day = 0;
   float temperature_c = 0.0f;
+  float target_temperature_c = 0.0f;
   float fridge_temperature_c = 0.0f;
   float specific_gravity = 0.0f;
   float original_gravity = 0.0f;

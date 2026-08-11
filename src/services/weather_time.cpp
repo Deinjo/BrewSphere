@@ -139,6 +139,46 @@ void copyJsonString(const JsonVariantConst& value, char* target,
   snprintf(target, target_len, "%s", source);
 }
 
+bool copyMarkedDisplayName(const JsonVariantConst& value, char* target,
+                           size_t target_len) {
+  if (target_len == 0) {
+    return false;
+  }
+  const char* source = value | "";
+  const char* marker = strrchr(source, '#');
+  if (marker == nullptr || marker[1] == '\0') {
+    return false;
+  }
+  source = marker + 1;
+  while (*source == ' ' || *source == '\t') {
+    ++source;
+  }
+  if (*source == '\0') {
+    return false;
+  }
+  const char* end = strchr(source, ')');
+  const size_t source_length = end == nullptr
+                                   ? strlen(source)
+                                   : static_cast<size_t>(end - source);
+  snprintf(target, target_len, "%.*s", static_cast<int>(source_length), source);
+  size_t length = strlen(target);
+  while (length > 0 && (target[length - 1] == ' ' || target[length - 1] == '\t')) {
+    target[--length] = '\0';
+  }
+  return target[0] != '\0';
+}
+
+void copyDisplayName(const JsonVariantConst& value, char* target,
+                     size_t target_len) {
+  if (copyMarkedDisplayName(value, target, target_len)) {
+    return;
+  }
+  if (target_len == 0) {
+    return;
+  }
+  snprintf(target, target_len, "%s", value | "");
+}
+
 bool fetch(double, double) {
   if (config::kBrewfatherUserId[0] == '\0' ||
       config::kBrewfatherApiKey[0] == '\0') {
@@ -190,8 +230,20 @@ bool fetch(double, double) {
   next_data.valid = true;
   copyJsonString(batch["_id"], next_data.batch_id,
                 sizeof(next_data.batch_id));
-  copyJsonString(batch["name"], next_data.batch_name,
-                sizeof(next_data.batch_name));
+  if (!copyMarkedDisplayName(batch["description"], next_data.batch_name,
+                             sizeof(next_data.batch_name))) {
+    JsonArrayConst events = batch["events"].as<JsonArrayConst>();
+    for (JsonObjectConst event : events) {
+      if (copyMarkedDisplayName(event["description"], next_data.batch_name,
+                                sizeof(next_data.batch_name))) {
+        break;
+      }
+    }
+  }
+  if (next_data.batch_name[0] == '\0') {
+    copyDisplayName(batch["name"], next_data.batch_name,
+                    sizeof(next_data.batch_name));
+  }
   copyJsonString(batch["recipe"]["name"], next_data.recipe_name,
                 sizeof(next_data.recipe_name));
   copyJsonString(batch["status"], next_data.status, sizeof(next_data.status));
@@ -235,6 +287,9 @@ bool fetch(double, double) {
                                ? reading["fridgeTemp"].as<float>()
                                : NAN;
   next_data.temperature_c = s_temperature_c;
+  next_data.target_temperature_c = reading["temp_target"].is<float>()
+                                       ? reading["temp_target"].as<float>()
+                                       : 0.0f;
   next_data.fridge_temperature_c = s_fridge_temperature_c;
   next_data.specific_gravity = reading["sg"].is<float>()
                                    ? reading["sg"].as<float>()

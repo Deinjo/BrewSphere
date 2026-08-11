@@ -16,15 +16,15 @@ namespace {
 
 constexpr int kCenterX = 120;
 constexpr int kCenterY = 120;
-constexpr uint16_t kBackground = 0x0043;  // RGB ~ 0, 8, 24
-constexpr uint16_t kPanel = 0x08C5;       // RGB ~ 8, 54, 41
-constexpr uint16_t kPanelEdge = 0x2A9F;   // muted steel blue
+constexpr uint16_t kBackground = 0x09A9;  // #0b3552
+constexpr uint16_t kPanel = 0x11EB;       // #173f5d
+constexpr uint16_t kPanelEdge = 0x6433;   // #62869d
 constexpr uint16_t kPanelShadow = 0x0064; // RGB ~ 0, 12, 33
-constexpr uint16_t kBlue = 0x24BF;
-constexpr uint16_t kCyan = 0x5DFF;
-constexpr uint16_t kCream = 0xFFB0;
+constexpr uint16_t kBlue = 0x3C1B;        // #3d83df
+constexpr uint16_t kCyan = 0x46DB;        // #41dede
+constexpr uint16_t kCream = 0xFF13;       // #ffe39b
 constexpr uint16_t kWhite = 0xFFFF;
-constexpr uint16_t kMuted = 0x9D9F;
+constexpr uint16_t kMuted = 0x9D97;       // #9bb1c2
 
 LGFX_Sprite s_frame(&tft);
 bool s_frame_ready = false;
@@ -56,6 +56,17 @@ void drawCentered(const char* text, int y, uint16_t color, float size) {
   s_draw->drawString(text, kCenterX, y);
 }
 
+void drawFixedTemperature(const char* label, const char* value, int label_x,
+                          int value_x, int unit_x, int y) {
+  setSmooth(0.62f);
+  s_draw->setTextColor(kCyan, kBackground);
+  s_draw->setTextDatum(textdatum_t::middle_left);
+  s_draw->drawString(label, label_x, y);
+  s_draw->setTextDatum(textdatum_t::middle_right);
+  s_draw->drawString(value, value_x, y);
+  s_draw->drawString("\xC2\xB0C", unit_x, y);
+}
+
 void drawArcSegment(float start_deg, float end_deg, int radius, float width,
                     uint16_t color) {
   constexpr float kDegToRad = 0.01745329252f;
@@ -76,32 +87,26 @@ void drawArcSegment(float start_deg, float end_deg, int radius, float width,
 }
 
 void drawGaugeRing(float attenuation) {
-  (void)attenuation;
-  drawArcSegment(140.0f, 260.0f, 108, 5.0f, kBlue);
-  drawArcSegment(260.0f, 335.0f, 108, 5.0f, kCyan);
-  drawArcSegment(335.0f, 400.0f, 108, 5.0f, kCream);
+  drawArcSegment(145.0f, 395.0f, 110, 8.0f, kCyan);
+  const float ratio = clampPercent(attenuation) / 100.0f;
+  if (ratio > 0.0f) {
+    drawArcSegment(145.0f, 145.0f + 250.0f * ratio, 110, 8.0f, kBlue);
+  }
 
   constexpr float kDegToRad = 0.01745329252f;
-  constexpr int kDotCount = 43;
+  constexpr int kDotCount = 41;
+  const float color_break_ratio =
+      clampPercent(services::weather::data().measured_attenuation_percent) / 100.0f;
   for (int i = 0; i < kDotCount; ++i) {
     const float ratio = static_cast<float>(i) / (kDotCount - 1);
-    const float angle = (140.0f + 260.0f * ratio) * kDegToRad;
-    const int x = kCenterX + static_cast<int>(std::lround(std::cos(angle) * 96));
-    const int y = kCenterY + static_cast<int>(std::lround(std::sin(angle) * 96));
-    const uint16_t color = ratio < 0.52f ? kBlue : kCream;
-    s_draw->fillCircle(x, y, 2, color);
+    const float percent = ratio * 100.0f;
+    const float angle = (145.0f + 250.0f * ratio) * kDegToRad;
+    const int x = kCenterX + static_cast<int>(std::lround(std::cos(angle) * 97));
+    const int y = kCenterY + static_cast<int>(std::lround(std::sin(angle) * 97));
+    const uint16_t color = ratio < color_break_ratio ? kBlue : kCream;
+    const int radius = std::fmod(percent, 10.0f) < 0.01f ? 3 : 2;
+    s_draw->fillCircle(x, y, radius, color);
   }
-}
-
-void drawGaugeNeedle(float attenuation) {
-  constexpr float kDegToRad = 0.01745329252f;
-  const float ratio = clampPercent(attenuation) / 100.0f;
-  const float angle = (140.0f + 260.0f * ratio) * kDegToRad;
-  const int end_x = kCenterX + static_cast<int>(std::lround(std::cos(angle) * 92));
-  const int end_y = kCenterY + static_cast<int>(std::lround(std::sin(angle) * 92));
-  s_draw->drawWideLine(kCenterX, kCenterY, end_x, end_y, 1.5f, kCream);
-  s_draw->fillCircle(kCenterX, kCenterY, 4, kCream);
-  s_draw->fillCircle(kCenterX, kCenterY, 2, kBackground);
 }
 
 void fitText(char* output, size_t output_len, const char* input, int max_width) {
@@ -140,29 +145,35 @@ const char* displayStatus(const char* status) {
 }
 
 void drawInfoPanels() {
-  // The reference keeps the main gauge open; only the lower batch card is a
-  // filled panel.
-  s_draw->fillTriangle(35, 166, 207, 166, 176, 216, kPanel);
-  s_draw->fillTriangle(35, 166, 176, 216, 64, 216, kPanel);
-  s_draw->drawWideLine(35, 166, 207, 166, 1.0f, kPanelEdge);
+  s_draw->fillTriangle(34, 195, 57, 177, 183, 177, kPanel);
+  s_draw->fillTriangle(34, 195, 183, 177, 206, 195, kPanel);
+  s_draw->fillTriangle(34, 195, 206, 195, 177, 216, kPanel);
+  s_draw->fillTriangle(34, 195, 177, 216, 63, 216, kPanel);
+  s_draw->drawWideLine(57, 177, 183, 177, 1.0f, kPanelEdge);
+  s_draw->drawWideLine(34, 195, 63, 216, 1.0f, kPanelEdge);
+  s_draw->drawWideLine(63, 216, 177, 216, 1.0f, kPanelEdge);
+  s_draw->drawWideLine(177, 216, 206, 195, 1.0f, kPanelEdge);
 }
 
 void drawBatchPanel(const services::weather::BrewData& data) {
 
-  char batch[80] = {};
+  char batch[64] = {};
   if (data.batch_number > 0) {
-    snprintf(batch, sizeof(batch), "BATCH #%d  %s", data.batch_number,
+    snprintf(batch, sizeof(batch), "#%d  %s", data.batch_number,
              data.batch_name[0] != '\0' ? data.batch_name : "-");
   } else {
-    snprintf(batch, sizeof(batch), "BATCH  %s",
+    snprintf(batch, sizeof(batch), "%s",
              data.batch_name[0] != '\0' ? data.batch_name : "WAITING");
   }
   setSmooth(0.52f);
   char fitted_batch[48] = {};
-  fitText(fitted_batch, sizeof(fitted_batch), batch, 150);
-  s_draw->setTextDatum(textdatum_t::middle_center);
+  fitText(fitted_batch, sizeof(fitted_batch), batch, 105);
+  s_draw->setTextDatum(textdatum_t::middle_right);
+  s_draw->setTextColor(kMuted, kPanel);
+   s_draw->drawString("BATCH:", 112, 190);
+  s_draw->setTextDatum(textdatum_t::middle_left);
   s_draw->setTextColor(kWhite, kPanel);
-  s_draw->drawString(fitted_batch, kCenterX, 183);
+   s_draw->drawString(fitted_batch, 116, 190);
 
   const char* recipe = data.recipe_name[0] != '\0' ? data.recipe_name : data.status;
   setSmooth(0.42f);
@@ -193,10 +204,8 @@ void brewDisplayDraw() {
   s_draw->drawCircle(kCenterX, kCenterY, 112, 0x12B4);
 
   drawGaugeRing(data.measured_attenuation_percent);
-  drawGaugeNeedle(data.measured_attenuation_percent);
   drawInfoPanels();
 
-  drawCentered("ATTENUATION", 27, kCream, 0.42f);
   char attenuation[20] = {};
   if (data.measured_attenuation_percent > 0.0f) {
     snprintf(attenuation, sizeof(attenuation), "%.0f%%",
@@ -204,19 +213,22 @@ void brewDisplayDraw() {
   } else {
     snprintf(attenuation, sizeof(attenuation), "--%%");
   }
-  drawCentered(attenuation, 45, kCream, 0.58f);
+  char attenuation_label[32] = {};
+  snprintf(attenuation_label, sizeof(attenuation_label), "VERGAERGRAD %s",
+           attenuation);
+  drawCentered(attenuation_label, 27, kCream, 0.42f);
 
-  s_draw->drawWideLine(72, 67, 103, 67, 1.0f, kMuted);
-  s_draw->drawWideLine(137, 67, 168, 67, 1.0f, kMuted);
+  s_draw->drawWideLine(77, 67, 97, 67, 1.0f, kMuted);
+  s_draw->drawWideLine(143, 67, 163, 67, 1.0f, kMuted);
   drawCentered("PLATO", 67, kWhite, 0.5f);
   char gravity[20] = {};
   if (data.specific_gravity > 0.0f) {
-    snprintf(gravity, sizeof(gravity), "%.1f P",
+    snprintf(gravity, sizeof(gravity), "%.1f \xC2\xB0P",
              platoFromSg(data.specific_gravity));
   } else {
-    snprintf(gravity, sizeof(gravity), "--.- P");
+    snprintf(gravity, sizeof(gravity), "--.- \xC2\xB0P");
   }
-  drawCentered(gravity, 91, kCream, 2.0f);
+   drawCentered(gravity, 105, kCream, 2.0f);
   char target[20] = {};
   if (data.estimated_final_gravity > 0.0f) {
     snprintf(target, sizeof(target), "ZIEL %.1f P",
@@ -224,32 +236,42 @@ void brewDisplayDraw() {
   } else {
     snprintf(target, sizeof(target), "ZIEL --.- P");
   }
-  drawCentered(target, 112, kMuted, 0.40f);
-  drawCentered(displayStatus(data.status), 126, kWhite, 0.52f);
+   drawCentered(target, 119, kMuted, 0.40f);
+   drawCentered(displayStatus(data.status), 135, kWhite, 0.52f);
 
-  char temperature[32] = {};
+  char target_temperature[20] = {};
+  char fridge_temperature[20] = {};
   if (data.valid) {
+     snprintf(target_temperature, sizeof(target_temperature), "%.1f",
+              data.target_temperature_c);
     if (std::isfinite(data.fridge_temperature_c)) {
-      snprintf(temperature, sizeof(temperature), "%.1f C   F %.1f C",
-               data.temperature_c, data.fridge_temperature_c);
+       snprintf(fridge_temperature, sizeof(fridge_temperature), "%.1f",
+               data.fridge_temperature_c);
     } else {
-      snprintf(temperature, sizeof(temperature), "%.1f C   F --",
-               data.temperature_c);
+      snprintf(fridge_temperature, sizeof(fridge_temperature), "--.-");
     }
   } else {
-    snprintf(temperature, sizeof(temperature), "--.- C   F --");
+    snprintf(target_temperature, sizeof(target_temperature), "--.-");
+    snprintf(fridge_temperature, sizeof(fridge_temperature), "--.-");
   }
-  drawCentered(temperature, 148, kCyan, 0.62f);
+  drawFixedTemperature("S:", target_temperature, 42, 87, 105, 157);
+  drawFixedTemperature("I:", fridge_temperature, 135, 180, 197, 157);
 
   drawBatchPanel(data);
 
   char day[24] = {};
   if (data.brew_day > 0) {
-    snprintf(day, sizeof(day), "TAG %d", data.brew_day);
+    snprintf(day, sizeof(day), "TAG: %d", data.brew_day);
   } else {
-    snprintf(day, sizeof(day), "TAG --");
+    snprintf(day, sizeof(day), "TAG: --");
   }
-  drawCentered(day, 229, kWhite, 0.52f);
+  setSmooth(0.60f);
+  s_draw->setTextDatum(textdatum_t::middle_right);
+  s_draw->setTextColor(kMuted, kBackground);
+  s_draw->drawString("TAG:", 112, 229);
+  s_draw->setTextDatum(textdatum_t::middle_left);
+  s_draw->setTextColor(kWhite, kBackground);
+  s_draw->drawString(data.brew_day > 0 ? day + 5 : "--", 116, 229);
 
   s_frame.pushSprite(0, 0);
   s_draw = &tft;
