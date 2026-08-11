@@ -75,7 +75,7 @@ void drawCentered(const char* text, int y, uint16_t color, float size) {
 
 void drawFixedTemperature(const char* label, const char* value, int label_x,
                           int value_x, int unit_x, int y) {
-  setSmooth(0.62f);
+  setSmooth(1.0f);
   s_draw->setTextColor(kCyan, kBackground);
   s_draw->setTextDatum(textdatum_t::middle_left);
   s_draw->drawString(label, label_x, y);
@@ -189,7 +189,7 @@ void drawBatchPanel(const services::weather::BrewData& data) {
     snprintf(batch, sizeof(batch), "%s",
              data.batch_name[0] != '\0' ? data.batch_name : "WAITING");
   }
-  setSmooth(0.52f);
+   setSmooth(0.80f);
   char fitted_batch[48] = {};
   fitText(fitted_batch, sizeof(fitted_batch), batch, 105);
   s_draw->setTextDatum(textdatum_t::middle_right);
@@ -200,12 +200,13 @@ void drawBatchPanel(const services::weather::BrewData& data) {
    s_draw->drawString(fitted_batch, 116, 190);
 
   const char* recipe = data.recipe_name[0] != '\0' ? data.recipe_name : data.status;
-  setSmooth(0.42f);
+   setSmooth(0.80f);
   char fitted_recipe[48] = {};
   fitText(fitted_recipe, sizeof(fitted_recipe), recipe, 150);
    s_draw->setTextColor(kRecipe, kPanel);
-  s_draw->drawString(fitted_recipe[0] != '\0' ? fitted_recipe : "BREWFATHER",
-                     kCenterX, 202);
+   s_draw->setTextDatum(textdatum_t::middle_center);
+   s_draw->drawString(fitted_recipe[0] != '\0' ? fitted_recipe : "BREWFATHER",
+                      kCenterX, 202);
 }
 
 }  // namespace
@@ -237,11 +238,11 @@ void brewDisplayDraw() {
   char attenuation_label[32] = {};
   snprintf(attenuation_label, sizeof(attenuation_label), "VERGAERGRAD %s",
            attenuation);
-  drawCentered(attenuation_label, 27, kCream, 0.42f);
+  drawCentered(attenuation_label, 27, kCream, 0.93f);
 
   s_draw->drawWideLine(77, 67, 97, 67, 1.0f, kMuted);
   s_draw->drawWideLine(143, 67, 163, 67, 1.0f, kMuted);
-   drawCentered("PLATO", 67, kLabel, 0.5f);
+  drawCentered("PLATO", 67, kLabel, 0.80f);
   char gravity[20] = {};
   if (data.specific_gravity > 0.0f) {
     snprintf(gravity, sizeof(gravity), "%.1f \xC2\xB0P",
@@ -249,7 +250,7 @@ void brewDisplayDraw() {
   } else {
     snprintf(gravity, sizeof(gravity), "--.- \xC2\xB0P");
   }
-    drawCentered(gravity, 105, kPlato, 2.0f);
+    drawCentered(gravity, 105, kPlato, 2.33f);
   char target[20] = {};
   if (data.estimated_final_gravity > 0.0f) {
     snprintf(target, sizeof(target), "ZIEL %.1f P",
@@ -258,7 +259,7 @@ void brewDisplayDraw() {
     snprintf(target, sizeof(target), "ZIEL --.- P");
   }
    drawCentered(target, 119, kMuted, 0.40f);
-   drawCentered(displayStatus(data.status), 135, kPlato, 0.52f);
+   drawCentered(displayStatus(data.status), 135, kPlato, 0.87f);
 
   char target_temperature[20] = {};
   char fridge_temperature[20] = {};
@@ -286,7 +287,7 @@ void brewDisplayDraw() {
   } else {
     snprintf(day, sizeof(day), "TAG: --");
   }
-  setSmooth(0.60f);
+  setSmooth(0.80f);
   s_draw->setTextDatum(textdatum_t::middle_right);
    s_draw->setTextColor(kBatchLabel, kBackground);
   s_draw->drawString("TAG:", 112, 229);
