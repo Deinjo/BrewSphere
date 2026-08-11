@@ -16,15 +16,33 @@ namespace {
 
 constexpr int kCenterX = 120;
 constexpr int kCenterY = 120;
-constexpr uint16_t kBackground = 0x09A9;  // #0b3552
-constexpr uint16_t kPanel = 0x11EB;       // #173f5d
-constexpr uint16_t kPanelEdge = 0x6433;   // #62869d
-constexpr uint16_t kPanelShadow = 0x0064; // RGB ~ 0, 12, 33
-constexpr uint16_t kBlue = 0x3C1B;        // #3d83df
-constexpr uint16_t kCyan = 0x46DB;        // #41dede
-constexpr uint16_t kCream = 0xFF13;       // #ffe39b
-constexpr uint16_t kWhite = 0xFFFF;
-constexpr uint16_t kMuted = 0x9D97;       // #9bb1c2
+
+// LovyanGFX swaps red and blue for this panel when rgb_order is enabled.
+constexpr uint16_t displayColor(uint8_t red, uint8_t green, uint8_t blue) {
+  const uint8_t panel_red = config::kDisplayRgbOrder ? blue : red;
+  const uint8_t panel_blue = config::kDisplayRgbOrder ? red : blue;
+  return static_cast<uint16_t>(((panel_red & 0xF8u) << 8) |
+                               ((green & 0xFCu) << 3) |
+                               (panel_blue >> 3));
+}
+
+constexpr uint16_t kBackground = displayColor(0x0B, 0x35, 0x52);  // #0b3552
+constexpr uint16_t kPanel = displayColor(0x17, 0x3F, 0x5D);       // #173f5d
+constexpr uint16_t kPanelEdge = displayColor(0x62, 0x86, 0x9D);   // #62869d
+constexpr uint16_t kBlue = displayColor(0x3D, 0x83, 0xDF);        // #3d83df
+constexpr uint16_t kCyan = displayColor(0x41, 0xDE, 0xDE);        // #41dede
+constexpr uint16_t kCream = displayColor(0xFF, 0xE3, 0x9B);      // #ffe39b
+constexpr uint16_t kPlato = displayColor(0xFF, 0xF1, 0xC9);      // #fff1c9
+constexpr uint16_t kLabel = displayColor(0xE8, 0xF0, 0xF5);       // #e8f0f5
+constexpr uint16_t kMuted = displayColor(0x9B, 0xB1, 0xC2);       // #9bb1c2
+constexpr uint16_t kBatchLabel = displayColor(0x7B, 0x96, 0xA8); // #7b96a8
+constexpr uint16_t kBatchValue = displayColor(0xF0, 0xF4, 0xF6); // #f0f4f6
+constexpr uint16_t kRecipe = displayColor(0xD5, 0xE0, 0xE7);     // #d5e0e7
+
+static_assert(kBackground == (config::kDisplayRgbOrder ? 0x51A1 : 0x09A9));
+static_assert(kBlue == (config::kDisplayRgbOrder ? 0xDC07 : 0x3C1B));
+static_assert(kCyan == (config::kDisplayRgbOrder ? 0xDEC8 : 0x46DB));
+static_assert(kCream == (config::kDisplayRgbOrder ? 0x973F : 0xFF13));
 
 LGFX_Sprite s_frame(&tft);
 bool s_frame_ready = false;
@@ -145,11 +163,18 @@ const char* displayStatus(const char* status) {
 }
 
 void drawInfoPanels() {
-  s_draw->fillTriangle(34, 195, 57, 177, 183, 177, kPanel);
+  s_draw->fillTriangle(34, 195, 57, 177, 64, 174, kPanel);
+  s_draw->fillTriangle(34, 195, 64, 174, 176, 174, kPanel);
+  s_draw->fillTriangle(34, 195, 176, 174, 183, 177, kPanel);
   s_draw->fillTriangle(34, 195, 183, 177, 206, 195, kPanel);
   s_draw->fillTriangle(34, 195, 206, 195, 177, 216, kPanel);
   s_draw->fillTriangle(34, 195, 177, 216, 63, 216, kPanel);
+  s_draw->drawWideLine(57, 177, 64, 174, 1.0f, kPanelEdge);
+  s_draw->drawWideLine(64, 174, 176, 174, 1.0f, kPanelEdge);
+  s_draw->drawWideLine(176, 174, 183, 177, 1.0f, kPanelEdge);
   s_draw->drawWideLine(57, 177, 183, 177, 1.0f, kPanelEdge);
+  s_draw->drawWideLine(34, 195, 57, 177, 1.0f, kPanelEdge);
+  s_draw->drawWideLine(183, 177, 206, 195, 1.0f, kPanelEdge);
   s_draw->drawWideLine(34, 195, 63, 216, 1.0f, kPanelEdge);
   s_draw->drawWideLine(63, 216, 177, 216, 1.0f, kPanelEdge);
   s_draw->drawWideLine(177, 216, 206, 195, 1.0f, kPanelEdge);
@@ -169,17 +194,17 @@ void drawBatchPanel(const services::weather::BrewData& data) {
   char fitted_batch[48] = {};
   fitText(fitted_batch, sizeof(fitted_batch), batch, 105);
   s_draw->setTextDatum(textdatum_t::middle_right);
-  s_draw->setTextColor(kMuted, kPanel);
+   s_draw->setTextColor(kBatchLabel, kPanel);
    s_draw->drawString("BATCH:", 112, 190);
-  s_draw->setTextDatum(textdatum_t::middle_left);
-  s_draw->setTextColor(kWhite, kPanel);
+   s_draw->setTextDatum(textdatum_t::middle_left);
+   s_draw->setTextColor(kBatchValue, kPanel);
    s_draw->drawString(fitted_batch, 116, 190);
 
   const char* recipe = data.recipe_name[0] != '\0' ? data.recipe_name : data.status;
   setSmooth(0.42f);
   char fitted_recipe[48] = {};
   fitText(fitted_recipe, sizeof(fitted_recipe), recipe, 150);
-  s_draw->setTextColor(kMuted, kPanel);
+   s_draw->setTextColor(kRecipe, kPanel);
   s_draw->drawString(fitted_recipe[0] != '\0' ? fitted_recipe : "BREWFATHER",
                      kCenterX, 202);
 }
@@ -199,9 +224,6 @@ void brewDisplayDraw() {
   s_draw = &s_frame;
 
   s_draw->fillScreen(kBackground);
-  s_draw->fillCircle(kCenterX, kCenterY, 116, kBackground);
-  s_draw->drawCircle(kCenterX, kCenterY, 116, 0x39D7);
-  s_draw->drawCircle(kCenterX, kCenterY, 112, 0x12B4);
 
   drawGaugeRing(data.measured_attenuation_percent);
   drawInfoPanels();
@@ -220,7 +242,7 @@ void brewDisplayDraw() {
 
   s_draw->drawWideLine(77, 67, 97, 67, 1.0f, kMuted);
   s_draw->drawWideLine(143, 67, 163, 67, 1.0f, kMuted);
-  drawCentered("PLATO", 67, kWhite, 0.5f);
+   drawCentered("PLATO", 67, kLabel, 0.5f);
   char gravity[20] = {};
   if (data.specific_gravity > 0.0f) {
     snprintf(gravity, sizeof(gravity), "%.1f \xC2\xB0P",
@@ -228,7 +250,7 @@ void brewDisplayDraw() {
   } else {
     snprintf(gravity, sizeof(gravity), "--.- \xC2\xB0P");
   }
-   drawCentered(gravity, 105, kCream, 2.0f);
+    drawCentered(gravity, 105, kPlato, 2.0f);
   char target[20] = {};
   if (data.estimated_final_gravity > 0.0f) {
     snprintf(target, sizeof(target), "ZIEL %.1f P",
@@ -237,7 +259,7 @@ void brewDisplayDraw() {
     snprintf(target, sizeof(target), "ZIEL --.- P");
   }
    drawCentered(target, 119, kMuted, 0.40f);
-   drawCentered(displayStatus(data.status), 135, kWhite, 0.52f);
+   drawCentered(displayStatus(data.status), 135, kPlato, 0.52f);
 
   char target_temperature[20] = {};
   char fridge_temperature[20] = {};
@@ -267,10 +289,10 @@ void brewDisplayDraw() {
   }
   setSmooth(0.60f);
   s_draw->setTextDatum(textdatum_t::middle_right);
-  s_draw->setTextColor(kMuted, kBackground);
+   s_draw->setTextColor(kBatchLabel, kBackground);
   s_draw->drawString("TAG:", 112, 229);
   s_draw->setTextDatum(textdatum_t::middle_left);
-  s_draw->setTextColor(kWhite, kBackground);
+   s_draw->setTextColor(kRecipe, kBackground);
   s_draw->drawString(data.brew_day > 0 ? day + 5 : "--", 116, 229);
 
   s_frame.pushSprite(0, 0);
@@ -315,6 +337,11 @@ void brewDisplayWriteBmp(Print& output) {
       uint8_t red = static_cast<uint8_t>((pixel >> 11) & 0x1F);
       const uint8_t green = static_cast<uint8_t>((pixel >> 5) & 0x3F);
       uint8_t blue = static_cast<uint8_t>(pixel & 0x1F);
+      // Sprite pixels use the panel-compensated RGB565 values. Restore the
+      // logical RGB order when exporting a browser-visible BMP.
+      if (config::kDisplayRgbOrder) {
+        std::swap(red, blue);
+      }
       row[x * 3] = static_cast<uint8_t>((blue << 3) | (blue >> 2));
       row[x * 3 + 1] = static_cast<uint8_t>((green << 2) | (green >> 4));
       row[x * 3 + 2] = static_cast<uint8_t>((red << 3) | (red >> 2));
