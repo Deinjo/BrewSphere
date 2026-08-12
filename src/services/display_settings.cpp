@@ -22,6 +22,7 @@ constexpr char kKeyNightEnabled[] = "nightOn";
 constexpr char kKeyNightStart[] = "nightStart";
 constexpr char kKeyNightEnd[] = "nightEnd";
 constexpr char kKeyOtaPassword[] = "otaPass";
+constexpr char kLegacyDefaultOtaPassword[] = "plane-radar";
 constexpr char kKeyColorBackground[] = "colBg";
 constexpr char kKeyColorGrid[] = "colGrid";
 constexpr char kKeyColorLabel[] = "colLbl";
@@ -257,6 +258,7 @@ void persist() {
 
 void init() {
   loadDefaults();
+  bool migrate_legacy_ota_password = false;
 
   Preferences prefs;
   if (!prefs.begin(kPrefsNamespace, true)) {
@@ -296,8 +298,16 @@ void init() {
   if (s_ota_password[0] == '\0') {
     copyCleanText(config::kDefaultOtaPassword, s_ota_password,
                   sizeof(s_ota_password));
+  } else if (strcmp(s_ota_password, kLegacyDefaultOtaPassword) == 0) {
+    copyCleanText(config::kDefaultOtaPassword, s_ota_password,
+                  sizeof(s_ota_password));
+    migrate_legacy_ota_password = true;
   }
   prefs.end();
+  if (migrate_legacy_ota_password) {
+    persist();
+    Serial.println("settings: migrated legacy OTA password to BrewSphere default");
+  }
 }
 
 bool footerEnabled() { return s_footer_enabled; }
