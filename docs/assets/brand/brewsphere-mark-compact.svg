@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title">
+  <title id="title">BrewSphere compact mark</title>
+  <defs><clipPath id="beer"><path d="M48 48 L80 48 L76 93 Q64 98 52 93 Z"/></clipPath></defs>
+  <circle cx="64" cy="64" r="61" fill="#0B3552"/>
+  <circle cx="64" cy="64" r="53" fill="none" stroke="#3D83DF" stroke-width="9"/>
+  <circle cx="64" cy="64" r="53" fill="none" stroke="#FF9D00" stroke-width="9"
+          stroke-dasharray="41.6 291.4" transform="rotate(-45 64 64)"/>
+  <g stroke="#FFF1C9" stroke-width="3" stroke-linecap="butt">
+    <path d="M97.2 30.8 L105.7 22.3"/>
+    <path d="M111 64 L123 64"/>
+    <path d="M97.2 97.2 L105.7 105.7"/>
+    <path d="M30.8 97.2 L22.3 105.7"/>
+    <path d="M17 64 L5 64"/>
+    <path d="M30.8 30.8 L22.3 22.3"/>
+  </g>
+  <circle cx="64" cy="64" r="61" fill="none" stroke="#FFF1C9" stroke-width="2"/>
+  <path d="M47 43 Q48 35 55 37 Q64 30 72 37 Q80 35 81 43 Z" fill="#FFF1C9"/>
+  <path d="M46 47 Q46 72 51 96 Q64 102 77 96 Q82 72 82 47" fill="none"
+        stroke="#FFF1C9" stroke-width="6" stroke-linejoin="round"/>
+  <path d="M44 69 Q64 75 84 68 L84 101 L44 101 Z" fill="#FF9D00" clip-path="url(#beer)"/>
+  <circle cx="69" cy="61" r="4" fill="#41DEDE"/>
+</svg>

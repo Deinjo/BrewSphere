@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">BrewSphere monochrome mark</title>
+  <g fill="none" stroke="#0B3552" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="256" cy="256" r="220" stroke-width="30"/>
+    <circle cx="256" cy="256" r="178" stroke-width="10"/>
+    <path d="M205 171 C205 151 222 142 239 148 C248 137 267 137 276 148 C294 142 311 151 311 171" stroke-width="16"/>
+    <path d="M207 188 C206 237 210 286 220 350 Q256 365 292 350 C302 286 306 237 305 188" stroke-width="16"/>
+    <path d="M220 276 Q256 287 292 275" stroke-width="12"/>
+    <circle cx="273" cy="237" r="11" stroke-width="8"/>
+    <circle cx="250" cy="262" r="7" stroke-width="7"/>
+  </g>
+</svg>
