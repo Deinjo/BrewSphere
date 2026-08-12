@@ -249,7 +249,7 @@ bool settingsWriteAuthenticated() {
 }
 
 void handleBrewSettingsPage() {
-  if (!s_wm.server) {
+  if (!s_wm.server || !settingsWriteAuthenticated()) {
     return;
   }
   const services::brew::SimulatedValues& simulated =
@@ -276,6 +276,7 @@ void handleBrewSettingsPage() {
       "input:focus,select:focus{outline:0;border-color:#7098aa;"
       "box-shadow:0 0 0 2px #7098aa33}.simulation{display:contents}"
       ".actions{display:flex;gap:10px;margin-top:22px;flex-wrap:wrap}"
+      ".live-status{align-self:center;color:#8eb5c5;min-width:9rem}"
       "button,a{padding:9px 14px;background:#38596b;color:#eef5f8;"
       "border:1px solid #5e8191;border-radius:6px;text-decoration:none;"
       "font:inherit;cursor:pointer}button:hover,a:hover{background:#486f80}"
@@ -283,7 +284,7 @@ void handleBrewSettingsPage() {
       "border-left:3px solid #62899d;border-radius:6px;color:#aebdca}"
       "@media(max-width:560px){body{padding:12px}form{padding:16px}"
       ".grid{grid-template-columns:1fr}.full,.hint{grid-column:1}}"
-      "</style></head><body><main><form method='post' action='/brew-save'>"
+      "</style></head><body><main><form id='brewForm' method='post' action='/brew-save'>"
       "<h1>BrewSphere Datenquelle</h1>"
       "<p class='intro'>Zwischen echten Brewfather-Daten und frei einstellbaren "
       "Testwerten wechseln.</p><div class='grid'><div class='full'>"
@@ -299,8 +300,8 @@ void handleBrewSettingsPage() {
   }
   html += F(">Simulierte Werte</option></select></div>"
             "<div id='simulation' class='simulation'>"
-            "<p class='hint'>Die Werte werden nach dem Speichern sofort auf "
-            "dem Display und in der Webvorschau verwendet.</p>");
+            "<p class='hint'>Änderungen werden live auf dem Display und in der "
+            "Webvorschau verwendet. Speichern übernimmt sie dauerhaft.</p>");
   appendTextInput(html, "sim_batch_name", "Sudname", simulated.batch_name, 63);
   appendTextInput(html, "sim_recipe_name", "Rezeptname", simulated.recipe_name,
                   63);
@@ -330,13 +331,46 @@ void handleBrewSettingsPage() {
                     "1");
   html += F(
       "</div></div><div class='actions'><button type='submit'>Speichern</button>"
-      "<a href='/display'>Display ansehen</a><a href='/'>Home</a></div></form>"
-      "</main><script>(function(){var source=document.getElementById('brew_source'),"
-      "fields=document.getElementById('simulation');function update(){"
+      "<a href='/display'>Display ansehen</a><a href='/'>Home</a>"
+      "<span id='liveStatus' class='live-status'>Live bereit</span></div></form>"
+      "</main><script>(function(){var form=document.getElementById('brewForm'),"
+      "source=document.getElementById('brew_source'),"
+      "fields=document.getElementById('simulation'),"
+      "status=document.getElementById('liveStatus'),timer;function update(){"
       "fields.style.display=source.value==='simulated'?'contents':'none';}"
-      "source.addEventListener('change',update);update();})();</script>"
+      "function live(){clearTimeout(timer);status.textContent='Änderung...';"
+      "timer=setTimeout(function(){fetch('/brew-live',{method:'POST',"
+      "body:new FormData(form),credentials:'same-origin'}).then(function(response){"
+      "if(!response.ok)throw new Error();status.textContent='Live aktualisiert';})"
+      ".catch(function(){status.textContent='Eingabe prüfen';});},300);}"
+      "form.addEventListener('input',live);source.addEventListener('change',"
+      "function(){update();live();});update();})();</script>"
       "</body></html>");
   s_wm.server->send(200, "text/html; charset=utf-8", html);
+}
+
+bool applyBrewSettingsRequest(WebServer& web, bool persist_values) {
+  return services::brew::saveFromPortal(
+      web.arg("brew_source").c_str(), web.arg("sim_batch_name").c_str(),
+      web.arg("sim_recipe_name").c_str(), web.arg("sim_status").c_str(),
+      web.arg("sim_batch_number").c_str(), web.arg("sim_brew_day").c_str(),
+      web.arg("sim_plato").c_str(), web.arg("sim_target_plato").c_str(),
+      web.arg("sim_target_temp").c_str(), web.arg("sim_fridge_temp").c_str(),
+      web.arg("sim_attenuation").c_str(),
+      web.arg("sim_end_attenuation").c_str(), persist_values);
+}
+
+void handleBrewSettingsLive() {
+  if (!s_wm.server || !settingsWriteAuthenticated()) {
+    return;
+  }
+  WebServer& web = *s_wm.server;
+  if (!applyBrewSettingsRequest(web, false)) {
+    web.send(400, "text/plain", "Invalid simulation values");
+    return;
+  }
+  services::weather::requestRefresh();
+  web.send(204, "text/plain", "");
 }
 
 void handleBrewSettingsSaved() {
@@ -344,14 +378,7 @@ void handleBrewSettingsSaved() {
     return;
   }
   WebServer& web = *s_wm.server;
-  const bool saved = services::brew::saveFromPortal(
-      web.arg("brew_source").c_str(), web.arg("sim_batch_name").c_str(),
-      web.arg("sim_recipe_name").c_str(), web.arg("sim_status").c_str(),
-      web.arg("sim_batch_number").c_str(), web.arg("sim_brew_day").c_str(),
-      web.arg("sim_plato").c_str(), web.arg("sim_target_plato").c_str(),
-      web.arg("sim_target_temp").c_str(), web.arg("sim_fridge_temp").c_str(),
-      web.arg("sim_attenuation").c_str(),
-      web.arg("sim_end_attenuation").c_str());
+  const bool saved = applyBrewSettingsRequest(web, true);
   if (!saved) {
     web.send(400, "text/html; charset=utf-8",
              "<!doctype html><html lang='de'><meta charset='utf-8'>"
@@ -894,6 +921,7 @@ void attachSettingsRoutes() {
   s_wm.server->on("/display", HTTP_GET, handleDisplayPage);
   s_wm.server->on("/display.bmp", HTTP_GET, handleDisplayBmp);
   s_wm.server->on("/brew", HTTP_GET, handleBrewSettingsPage);
+  s_wm.server->on("/brew-live", HTTP_POST, handleBrewSettingsLive);
   s_wm.server->on("/brew-save", HTTP_POST, handleBrewSettingsSaved);
   // Register before WiFiManager's built-in /paramsave handler so the custom
   // confirmation can redirect back to Setup.

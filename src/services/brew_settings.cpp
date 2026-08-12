@@ -207,14 +207,17 @@ bool saveFromPortal(const char* source, const char* batch_name,
                     const char* target_temperature_c,
                     const char* fridge_temperature_c,
                     const char* attenuation_percent,
-                    const char* end_attenuation_percent) {
+                    const char* end_attenuation_percent,
+                    bool persist_values) {
   const SourceMode requested_mode =
       source != nullptr && strcmp(source, "simulated") == 0
           ? SourceMode::kSimulated
           : SourceMode::kBrewfatherApi;
   if (requested_mode == SourceMode::kBrewfatherApi) {
     s_source_mode = requested_mode;
-    persist();
+    if (persist_values) {
+      persist();
+    }
     return true;
   }
 
@@ -258,7 +261,9 @@ bool saveFromPortal(const char* source, const char* batch_name,
   s_simulated.fridge_temperature_c = parsed_fridge_temperature;
   s_simulated.attenuation_percent = parsed_attenuation;
   s_simulated.end_attenuation_percent = parsed_end_attenuation;
-  persist();
+  if (persist_values) {
+    persist();
+  }
   return true;
 }
 

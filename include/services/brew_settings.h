@@ -29,7 +29,7 @@ void init();
 SourceMode sourceMode();
 const SimulatedValues& simulatedValues();
 
-/** Validate and persist values received from the web form. */
+/** Validate values received from the web form and optionally persist them. */
 bool saveFromPortal(const char* source, const char* batch_name,
                     const char* recipe_name, const char* status,
                     const char* batch_number, const char* brew_day,
@@ -37,7 +37,8 @@ bool saveFromPortal(const char* source, const char* batch_name,
                     const char* target_temperature_c,
                     const char* fridge_temperature_c,
                     const char* attenuation_percent,
-                    const char* end_attenuation_percent);
+                    const char* end_attenuation_percent,
+                    bool persist_values = true);
 
 /** Restore defaults during a full BOOT-button reset. */
 void clear();
