@@ -245,7 +245,9 @@ void drawGaugeRing(float attenuation, float end_attenuation) {
   const float ratio = clampPercent(attenuation) / 100.0f;
   if (ratio > 0.0f) {
     const float end_angle = 145.0f + 250.0f * ratio;
-    drawArcSegment(145.0f, end_angle, 110, 8.0f, kBlue);
+    // LovyanGFX drawWideLine uses this value as the line radius. A radius of
+    // four matches the SVG background arc's eight-pixel stroke width.
+    drawArcSegment(145.0f, end_angle, 110, 4.0f, kBlue);
     constexpr float kDegToRad = 0.01745329252f;
     const int start_x = kCenterX + static_cast<int>(
         std::lround(std::cos(145.0f * kDegToRad) * 110));

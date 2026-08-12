@@ -91,6 +91,11 @@ umgeschaltet werden. Im Simulationsmodus lassen sich alle Werte der
 Gärungsanzeige frei einstellen; nach dem Speichern aktualisieren sich das
 GC9A01-Display und die Webvorschau ohne Brewfather-Abfrage.
 
+Simulationsänderungen werden bereits während der Eingabe nach 300 ms live in
+den RAM übernommen. **Speichern** schreibt den aktuellen Stand zusätzlich
+dauerhaft nach NVS. Damit erzeugt die Live-Vorschau keine unnötigen
+Flash-Schreibzyklen.
+
 Der aktuelle Vergärgrad steuert den hellblauen Fortschrittsbogen über der
 cyanfarbenen Grundskala. Der getrennte Endvergärgrad bestimmt den Farbwechsel
 der 2,5-%-Punkteskala von Blau zu Blassgelb; jeder 10-%-Schritt einschließlich

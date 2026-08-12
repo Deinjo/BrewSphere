@@ -248,6 +248,21 @@ bool settingsWriteAuthenticated() {
   return false;
 }
 
+char s_brew_csrf_token[17] = {};
+
+void ensureBrewCsrfToken() {
+  if (s_brew_csrf_token[0] == '\0') {
+    snprintf(s_brew_csrf_token, sizeof(s_brew_csrf_token), "%08lx%08lx",
+             static_cast<unsigned long>(esp_random()),
+             static_cast<unsigned long>(esp_random()));
+  }
+}
+
+bool brewCsrfValid(WebServer& web) {
+  ensureBrewCsrfToken();
+  return web.arg("csrf") == s_brew_csrf_token;
+}
+
 void handleBrewSettingsPage() {
   if (!s_wm.server || !settingsWriteAuthenticated()) {
     return;
@@ -256,6 +271,7 @@ void handleBrewSettingsPage() {
       services::brew::simulatedValues();
   const bool simulation = services::brew::sourceMode() ==
                           services::brew::SourceMode::kSimulated;
+  ensureBrewCsrfToken();
 
   String html;
   html.reserve(7000);
@@ -298,8 +314,10 @@ void handleBrewSettingsPage() {
   if (simulation) {
     html += F(" selected");
   }
-  html += F(">Simulierte Werte</option></select></div>"
-            "<div id='simulation' class='simulation'>"
+  html += F(">Simulierte Werte</option></select>"
+            "<input type='hidden' name='csrf' value='");
+  html += s_brew_csrf_token;
+  html += F("'></div><div id='simulation' class='simulation'>"
             "<p class='hint'>Änderungen werden live auf dem Display und in der "
             "Webvorschau verwendet. Speichern übernimmt sie dauerhaft.</p>");
   appendTextInput(html, "sim_batch_name", "Sudname", simulated.batch_name, 63);
@@ -365,6 +383,10 @@ void handleBrewSettingsLive() {
     return;
   }
   WebServer& web = *s_wm.server;
+  if (!brewCsrfValid(web)) {
+    web.send(403, "text/plain", "Invalid form token");
+    return;
+  }
   if (!applyBrewSettingsRequest(web, false)) {
     web.send(400, "text/plain", "Invalid simulation values");
     return;
@@ -378,6 +400,10 @@ void handleBrewSettingsSaved() {
     return;
   }
   WebServer& web = *s_wm.server;
+  if (!brewCsrfValid(web)) {
+    web.send(403, "text/plain", "Invalid form token");
+    return;
+  }
   const bool saved = applyBrewSettingsRequest(web, true);
   if (!saved) {
     web.send(400, "text/html; charset=utf-8",
