@@ -96,6 +96,12 @@ den RAM übernommen. **Speichern** schreibt den aktuellen Stand zusätzlich
 dauerhaft nach NVS. Damit erzeugt die Live-Vorschau keine unnötigen
 Flash-Schreibzyklen.
 
+Alle Zahlenwerte können sowohl direkt eingegeben als auch über gekoppelte
+Schieberegler verändert werden. Im optionalen Demo-Modus bewegen sich Plato und
+Ist-Vergärgrad in einem dreiminütigen Zyklus langsam zwischen Start und Ziel;
+Soll- und Isttemperatur schwanken dabei dezent. Der Demo-Modus läuft auf dem
+Gerät auch ohne geöffnetes Browserfenster weiter.
+
 Der aktuelle Vergärgrad steuert den hellblauen Fortschrittsbogen über der
 cyanfarbenen Grundskala. Der getrennte Endvergärgrad bestimmt den Farbwechsel
 der 2,5-%-Punkteskala von Blau zu Blassgelb; jeder 10-%-Schritt einschließlich

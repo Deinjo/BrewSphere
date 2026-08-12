@@ -233,6 +233,18 @@ void appendNumberInput(String& html, const char* name, const char* label,
   html += step;
   html += F("' value='");
   html += value;
+  html += F("'><input class='range' type='range' tabindex='-1' aria-label='");
+  html += label;
+  html += F(" Schieberegler' data-number='");
+  html += name;
+  html += F("' min='");
+  html += minimum;
+  html += F("' max='");
+  html += maximum;
+  html += F("' step='");
+  html += step;
+  html += F("' value='");
+  html += value;
   html += F("'>");
 }
 
@@ -291,6 +303,10 @@ void handleBrewSettingsPage() {
       "color:#e4edf4;border:1px solid #35495b;border-radius:6px;font:inherit}"
       "input:focus,select:focus{outline:0;border-color:#7098aa;"
       "box-shadow:0 0 0 2px #7098aa33}.simulation{display:contents}"
+      ".range{grid-column:1/-1;margin-top:-7px;padding:0;accent-color:#41dede}"
+      ".check{grid-column:1/-1;"
+      "display:flex;align-items:center;gap:9px;padding:10px 12px;background:#0f1923;"
+      "border:1px solid #35495b;border-radius:6px}.check input{width:auto;margin:0}"
       ".actions{display:flex;gap:10px;margin-top:22px;flex-wrap:wrap}"
       ".live-status{align-self:center;color:#8eb5c5;min-width:9rem}"
       "button,a{padding:9px 14px;background:#38596b;color:#eef5f8;"
@@ -320,6 +336,12 @@ void handleBrewSettingsPage() {
   html += F("'></div><div id='simulation' class='simulation'>"
             "<p class='hint'>Änderungen werden live auf dem Display und in der "
             "Webvorschau verwendet. Speichern übernimmt sie dauerhaft.</p>");
+  html += F("<label class='check'><input id='sim_demo' name='sim_demo' "
+            "type='checkbox'");
+  if (simulated.demo_mode) {
+    html += F(" checked");
+  }
+  html += F(">Demo-Modus: Werte ändern sich langsam automatisch</label>");
   appendTextInput(html, "sim_batch_name", "Sudname", simulated.batch_name, 63);
   appendTextInput(html, "sim_recipe_name", "Rezeptname", simulated.recipe_name,
                   63);
@@ -361,6 +383,12 @@ void handleBrewSettingsPage() {
       "body:new FormData(form),credentials:'same-origin'}).then(function(response){"
       "if(!response.ok)throw new Error();status.textContent='Live aktualisiert';})"
       ".catch(function(){status.textContent='Eingabe prüfen';});},300);}"
+      "document.querySelectorAll('.range').forEach(function(range){"
+      "range.addEventListener('input',function(){document.getElementById("
+      "range.dataset.number).value=range.value;});});"
+      "form.querySelectorAll('input[type=number]').forEach(function(number){"
+      "number.addEventListener('input',function(){var range=form.querySelector("
+      "'.range[data-number=\"'+number.id+'\"]');if(range)range.value=number.value;});});"
       "form.addEventListener('input',live);source.addEventListener('change',"
       "function(){update();live();});update();})();</script>"
       "</body></html>");
@@ -371,6 +399,7 @@ bool applyBrewSettingsRequest(WebServer& web, bool persist_values) {
   return services::brew::saveFromPortal(
       web.arg("brew_source").c_str(), web.arg("sim_batch_name").c_str(),
       web.arg("sim_recipe_name").c_str(), web.arg("sim_status").c_str(),
+      web.arg("sim_demo").c_str(),
       web.arg("sim_batch_number").c_str(), web.arg("sim_brew_day").c_str(),
       web.arg("sim_plato").c_str(), web.arg("sim_target_plato").c_str(),
       web.arg("sim_target_temp").c_str(), web.arg("sim_fridge_temp").c_str(),

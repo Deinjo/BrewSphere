@@ -23,6 +23,7 @@ constexpr char kKeyTargetTemperature[] = "targetTemp";
 constexpr char kKeyFridgeTemperature[] = "fridgeTemp";
 constexpr char kKeyAttenuation[] = "attenuation";
 constexpr char kKeyEndAttenuation[] = "endAtten";
+constexpr char kKeyDemoMode[] = "demoMode";
 
 SourceMode s_source_mode = SourceMode::kBrewfatherApi;
 SimulatedValues s_simulated;
@@ -87,6 +88,7 @@ bool parseFloatInRange(const char* value, float minimum, float maximum,
 
 void loadDefaults() {
   s_source_mode = SourceMode::kBrewfatherApi;
+  s_simulated.demo_mode = false;
   copyDisplayText("Sud", s_simulated.batch_name,
                   sizeof(s_simulated.batch_name), "Sud");
   copyDisplayText("Erdbeer-Woelkchen", s_simulated.recipe_name,
@@ -136,6 +138,7 @@ void persist() {
     return;
   }
   preferences.putUChar(kKeySource, static_cast<uint8_t>(s_source_mode));
+  preferences.putBool(kKeyDemoMode, s_simulated.demo_mode);
   preferences.putString(kKeyBatchName, s_simulated.batch_name);
   preferences.putString(kKeyRecipeName, s_simulated.recipe_name);
   preferences.putString(kKeyStatus, s_simulated.status);
@@ -167,6 +170,7 @@ void init() {
   s_source_mode = source == static_cast<uint8_t>(SourceMode::kSimulated)
                       ? SourceMode::kSimulated
                       : SourceMode::kBrewfatherApi;
+  s_simulated.demo_mode = preferences.getBool(kKeyDemoMode, false);
 
   String value = preferences.getString(kKeyBatchName, s_simulated.batch_name);
   copyDisplayText(value.c_str(), s_simulated.batch_name,
@@ -202,6 +206,7 @@ const SimulatedValues& simulatedValues() { return s_simulated; }
 
 bool saveFromPortal(const char* source, const char* batch_name,
                     const char* recipe_name, const char* status,
+                    const char* demo_mode,
                     const char* batch_number, const char* brew_day,
                     const char* plato, const char* target_plato,
                     const char* target_temperature_c,
@@ -246,6 +251,7 @@ bool saveFromPortal(const char* source, const char* batch_name,
   }
 
   s_source_mode = requested_mode;
+  s_simulated.demo_mode = demo_mode != nullptr && demo_mode[0] != '\0';
   copyDisplayText(batch_name, s_simulated.batch_name,
                   sizeof(s_simulated.batch_name), "Sud");
   copyDisplayText(recipe_name, s_simulated.recipe_name,

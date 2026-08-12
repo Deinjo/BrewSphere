@@ -209,6 +209,34 @@ float specificGravityFromPlato(float plato) {
 
 bool applySimulatedValues() {
   const brew::SimulatedValues& simulated = brew::simulatedValues();
+  float current_plato = simulated.plato;
+  float attenuation = simulated.attenuation_percent;
+  float target_temperature = simulated.target_temperature_c;
+  float fridge_temperature = simulated.fridge_temperature_c;
+  static bool demo_was_active = false;
+  static unsigned long demo_started_ms = 0;
+  if (simulated.demo_mode) {
+    constexpr float kTwoPi = 6.283185307f;
+    constexpr unsigned long kDemoCycleMs = 180000UL;
+    if (!demo_was_active) {
+      demo_started_ms = millis();
+      demo_was_active = true;
+    }
+    const float phase =
+        static_cast<float>((millis() - demo_started_ms) % kDemoCycleMs) /
+                        static_cast<float>(kDemoCycleMs);
+    const float progress = 0.5f - 0.5f * std::cos(kTwoPi * phase);
+    current_plato = simulated.plato +
+                    (simulated.target_plato - simulated.plato) * progress;
+    attenuation = simulated.attenuation_percent +
+                  (simulated.end_attenuation_percent -
+                   simulated.attenuation_percent) * progress;
+    target_temperature += 0.15f * std::sin(kTwoPi * phase);
+    fridge_temperature += 0.35f * std::sin(kTwoPi * phase + 0.9f);
+  } else {
+    demo_was_active = false;
+  }
+
   BrewData next_data;
   next_data.valid = true;
   snprintf(next_data.batch_id, sizeof(next_data.batch_id), "simulated");
@@ -219,25 +247,30 @@ bool applySimulatedValues() {
   snprintf(next_data.status, sizeof(next_data.status), "%s", simulated.status);
   next_data.batch_number = simulated.batch_number;
   next_data.brew_day = simulated.brew_day;
-  next_data.temperature_c = simulated.fridge_temperature_c;
-  next_data.target_temperature_c = simulated.target_temperature_c;
-  next_data.fridge_temperature_c = simulated.fridge_temperature_c;
-  next_data.specific_gravity = specificGravityFromPlato(simulated.plato);
-  next_data.original_gravity = next_data.specific_gravity;
+  next_data.temperature_c = fridge_temperature;
+  next_data.target_temperature_c = target_temperature;
+  next_data.fridge_temperature_c = fridge_temperature;
+  next_data.specific_gravity = specificGravityFromPlato(current_plato);
+  next_data.original_gravity = specificGravityFromPlato(simulated.plato);
   next_data.estimated_final_gravity =
       specificGravityFromPlato(simulated.target_plato);
   next_data.measured_final_gravity = next_data.specific_gravity;
-  next_data.measured_attenuation_percent = simulated.attenuation_percent;
+  next_data.measured_attenuation_percent = attenuation;
   next_data.end_attenuation_percent = simulated.end_attenuation_percent;
 
   s_data = next_data;
   s_temperature_c = next_data.temperature_c;
   s_fridge_temperature_c = next_data.fridge_temperature_c;
   s_valid = true;
-  Serial.printf(
-      "brew simulation: %.1f P, target %.1f P, attenuation %.0f/%.0f%%\n",
-      simulated.plato, simulated.target_plato,
-      simulated.attenuation_percent, simulated.end_attenuation_percent);
+  static unsigned long last_demo_log_ms = 0;
+  if (!simulated.demo_mode || millis() - last_demo_log_ms >= 10000UL) {
+    Serial.printf(
+        "brew simulation%s: %.1f P, target %.1f P, attenuation %.0f/%.0f%%\n",
+        simulated.demo_mode ? " demo" : "", current_plato,
+        simulated.target_plato, attenuation,
+        simulated.end_attenuation_percent);
+    last_demo_log_ms = millis();
+  }
   return true;
 }
 
@@ -422,13 +455,18 @@ bool refreshIfDue(double latitude, double longitude, bool force) {
   begin();
   const unsigned long now = millis();
   const brew::SourceMode source_mode = brew::sourceMode();
+  const bool simulation_demo =
+      source_mode == brew::SourceMode::kSimulated &&
+      brew::simulatedValues().demo_mode;
+  const unsigned long refresh_interval_ms =
+      simulation_demo ? 1000UL : config::kBrewfatherFetchIntervalMs;
   const bool source_changed = source_mode != s_last_source_mode;
   const bool location_changed =
       fabs(latitude - s_last_latitude) > 0.0001 ||
       fabs(longitude - s_last_longitude) > 0.0001;
   if (!force && !s_refresh_requested && !source_changed && !location_changed &&
       s_last_attempt_ms != 0 &&
-       now - s_last_attempt_ms < config::kBrewfatherFetchIntervalMs) {
+      now - s_last_attempt_ms < refresh_interval_ms) {
     return false;
   }
   s_refresh_requested = false;

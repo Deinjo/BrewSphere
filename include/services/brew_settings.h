@@ -10,6 +10,7 @@ enum class SourceMode : uint8_t {
 };
 
 struct SimulatedValues {
+  bool demo_mode = false;
   char batch_name[64] = {};
   char recipe_name[64] = {};
   char status[20] = {};
@@ -32,6 +33,7 @@ const SimulatedValues& simulatedValues();
 /** Validate values received from the web form and optionally persist them. */
 bool saveFromPortal(const char* source, const char* batch_name,
                     const char* recipe_name, const char* status,
+                    const char* demo_mode,
                     const char* batch_number, const char* brew_day,
                     const char* plato, const char* target_plato,
                     const char* target_temperature_c,
