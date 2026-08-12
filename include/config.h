@@ -73,9 +73,10 @@ constexpr int kDisplayWidth = 240;
 constexpr int kDisplayHeight = 240;
 
 constexpr uint32_t kDisplaySpiWriteHz = 40000000;
-// BrewSphere uses a dark navy palette; keep the panel colors uninverted.
-constexpr bool kDisplayInvert = false;
-constexpr bool kDisplayRgbOrder = true;
+// This GC9A01 module needs INVON and canonical RGB order. With the opposite
+// flags, navy appears cyan, cream black, and red/blue are exchanged.
+constexpr bool kDisplayInvert = true;
+constexpr bool kDisplayRgbOrder = false;
 
 // --- Radar center defaults (overridden via WiFi setup portal) ---
 constexpr double kDefaultRadarLat = PLANE_RADAR_DEFAULT_RADAR_LAT;
