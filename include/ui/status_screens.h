@@ -1,5 +1,10 @@
 #pragma once
 
+/** Show the RGB565-optimized BrewSphere startup emblem. */
+void statusScreenBrand();
+/** Show the RGB565-optimized two-line BrewSphere wordmark. */
+void statusScreenBrandWordmark();
+
 void statusScreenPortal();
 void statusScreenConnectFailed();
 void statusScreenWifiReset();

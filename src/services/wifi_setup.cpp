@@ -15,9 +15,11 @@
 
 #include "config.h"
 #include "hardware/display.h"
+#include "services/brew_settings.h"
 #include "services/display_settings.h"
 #include "services/ota_update.h"
 #include "services/radar_location.h"
+#include "services/weather_time.h"
 #include "ui/brew_display.h"
 #include "ui/radar_range.h"
 #include "ui/status_screens.h"
@@ -103,9 +105,10 @@ constexpr char kPortalGlobalStyle[] =
     "<script>document.addEventListener('DOMContentLoaded',function(){"
     "var w=document.querySelector('.wrap');if(!w)return;"
     "if(location.pathname==='/' ){"
-    "var r=document.createElement('div');r.className='c';"
-    "var d=document.createElement('a');d.href='/display';d.textContent='Display';"
-    "d.className='portal-menu-link';r.appendChild(d);w.appendChild(r);return;}"
+    "function l(h,t){var r=document.createElement('div');r.className='c';"
+    "var a=document.createElement('a');a.href=h;a.textContent=t;"
+    "a.className='portal-menu-link';r.appendChild(a);w.appendChild(r);}"
+    "l('/display','Display');l('/brew','Brewfather / Simulation');return;}"
     "var a=document.createElement('a');a.href='/';a.textContent='Home';"
     "a.className='home-link';w.prepend(a);"
     "});</script>";
@@ -140,16 +143,23 @@ void handleDisplayPage() {
                     "border:1px solid #526577;border-radius:8px}"
                     "a{display:inline-block;margin-top:16px;padding:8px 13px;"
                     "background:#38596b;color:#eef5f8;border:1px solid #5e8191;"
-                    "border-radius:6px;text-decoration:none}</style></head><body>"
+                     "border-radius:6px;text-decoration:none;margin:16px 6px 0}"
+                     "</style></head><body>"
                      "<main><h2>BrewSphere Display</h2>"
                     "<img id='display' src='/display.bmp'>"
                     "<script>setInterval(function(){document.getElementById('display').src="
                     "'/display.bmp?t='+Date.now()},5000);</script>"
-                    "<br><a href='/'>Home</a></main></body></html>");
+                     "<br><a href='/brew'>Datenquelle</a>"
+                     "<a href='/'>Home</a></main></body></html>");
 }
 
 void handleDisplayBmp() {
   if (!s_wm.server) {
+    return;
+  }
+  if (!ui::brewDisplayFrameAvailable()) {
+    s_wm.server->send(503, "text/plain",
+                      "Display preview unavailable: framebuffer allocation failed");
     return;
   }
   constexpr size_t kBmpSize = 54 + 240 * 240 * 3;
@@ -157,6 +167,204 @@ void handleDisplayBmp() {
   s_wm.server->send(200, "image/bmp", "");
   WiFiClient client = s_wm.server->client();
   ui::brewDisplayWriteBmp(client);
+}
+
+void appendHtmlEscaped(String& html, const char* value) {
+  if (value == nullptr) {
+    return;
+  }
+  while (*value != '\0') {
+    switch (*value++) {
+      case '&':
+        html += F("&amp;");
+        break;
+      case '<':
+        html += F("&lt;");
+        break;
+      case '>':
+        html += F("&gt;");
+        break;
+      case '\"':
+        html += F("&quot;");
+        break;
+      case '\'':
+        html += F("&#39;");
+        break;
+      default:
+        html += value[-1];
+        break;
+    }
+  }
+}
+
+void appendTextInput(String& html, const char* name, const char* label,
+                     const char* value, int max_length) {
+  html += F("<label for='");
+  html += name;
+  html += F("'>");
+  html += label;
+  html += F("</label><input id='");
+  html += name;
+  html += F("' name='");
+  html += name;
+  html += F("' type='text' maxlength='");
+  html += max_length;
+  html += F("' value='");
+  appendHtmlEscaped(html, value);
+  html += F("'>");
+}
+
+void appendNumberInput(String& html, const char* name, const char* label,
+                       const String& value, const char* minimum,
+                       const char* maximum, const char* step) {
+  html += F("<label for='");
+  html += name;
+  html += F("'>");
+  html += label;
+  html += F("</label><input id='");
+  html += name;
+  html += F("' name='");
+  html += name;
+  html += F("' type='number' min='");
+  html += minimum;
+  html += F("' max='");
+  html += maximum;
+  html += F("' step='");
+  html += step;
+  html += F("' value='");
+  html += value;
+  html += F("'>");
+}
+
+bool settingsWriteAuthenticated() {
+  if (!s_wm.server) {
+    return false;
+  }
+  if (s_wm.server->authenticate(config::kOtaUsername,
+                                services::settings::otaPassword())) {
+    return true;
+  }
+  s_wm.server->requestAuthentication();
+  return false;
+}
+
+void handleBrewSettingsPage() {
+  if (!s_wm.server) {
+    return;
+  }
+  const services::brew::SimulatedValues& simulated =
+      services::brew::simulatedValues();
+  const bool simulation = services::brew::sourceMode() ==
+                          services::brew::SourceMode::kSimulated;
+
+  String html;
+  html.reserve(7000);
+  html += F(
+      "<!doctype html><html lang='de'><head><meta charset='utf-8'>"
+      "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+      "<title>BrewSphere Datenquelle</title><style>"
+      "*{box-sizing:border-box}body{margin:0;padding:20px;background:#0d151e;"
+      "color:#d7e0e9;font:15px/1.45 Segoe UI,Arial,sans-serif}"
+      "main{max-width:680px;margin:auto}form{padding:24px;background:#141f2a;"
+      "border:1px solid #2a3a49;border-radius:12px;box-shadow:0 12px 32px #0005}"
+      "h1{margin:0 0 6px;color:#edf3f8;font-size:1.4rem}"
+      ".intro{margin:0 0 20px;color:#9aaabd}.grid{display:grid;"
+      "grid-template-columns:1fr 1fr;gap:14px 18px}.full{grid-column:1/-1}"
+      "label{display:block;margin:0 0 5px;color:#b8c6d3}"
+      "input,select{width:100%;padding:9px 10px;background:#0f1923;"
+      "color:#e4edf4;border:1px solid #35495b;border-radius:6px;font:inherit}"
+      "input:focus,select:focus{outline:0;border-color:#7098aa;"
+      "box-shadow:0 0 0 2px #7098aa33}.simulation{display:contents}"
+      ".actions{display:flex;gap:10px;margin-top:22px;flex-wrap:wrap}"
+      "button,a{padding:9px 14px;background:#38596b;color:#eef5f8;"
+      "border:1px solid #5e8191;border-radius:6px;text-decoration:none;"
+      "font:inherit;cursor:pointer}button:hover,a:hover{background:#486f80}"
+      ".hint{grid-column:1/-1;padding:10px 12px;background:#1a2937;"
+      "border-left:3px solid #62899d;border-radius:6px;color:#aebdca}"
+      "@media(max-width:560px){body{padding:12px}form{padding:16px}"
+      ".grid{grid-template-columns:1fr}.full,.hint{grid-column:1}}"
+      "</style></head><body><main><form method='post' action='/brew-save'>"
+      "<h1>BrewSphere Datenquelle</h1>"
+      "<p class='intro'>Zwischen echten Brewfather-Daten und frei einstellbaren "
+      "Testwerten wechseln.</p><div class='grid'><div class='full'>"
+      "<label for='brew_source'>Datenquelle</label>"
+      "<select id='brew_source' name='brew_source'>"
+      "<option value='brewfather'");
+  if (!simulation) {
+    html += F(" selected");
+  }
+  html += F(">Brewfather API</option><option value='simulated'");
+  if (simulation) {
+    html += F(" selected");
+  }
+  html += F(">Simulierte Werte</option></select></div>"
+            "<div id='simulation' class='simulation'>"
+            "<p class='hint'>Die Werte werden nach dem Speichern sofort auf "
+            "dem Display und in der Webvorschau verwendet.</p>");
+  appendTextInput(html, "sim_batch_name", "Sudname", simulated.batch_name, 63);
+  appendTextInput(html, "sim_recipe_name", "Rezeptname", simulated.recipe_name,
+                  63);
+  appendTextInput(html, "sim_status",
+                  "Status (Fermenting, Brewing oder Conditioning)",
+                  simulated.status, 19);
+  appendNumberInput(html, "sim_batch_number", "Batchnummer",
+                    String(simulated.batch_number), "0", "9999", "1");
+  appendNumberInput(html, "sim_brew_day", "Brautag",
+                    String(simulated.brew_day), "0", "9999", "1");
+  appendNumberInput(html, "sim_plato", "Aktueller Wert (&deg;P)",
+                    String(simulated.plato, 1), "0", "40", "0.1");
+  appendNumberInput(html, "sim_target_plato", "Zielwert (&deg;P)",
+                    String(simulated.target_plato, 1), "0", "40", "0.1");
+  appendNumberInput(html, "sim_target_temp", "Solltemperatur (&deg;C)",
+                    String(simulated.target_temperature_c, 1), "-20", "100",
+                    "0.1");
+  appendNumberInput(html, "sim_fridge_temp", "Isttemperatur (&deg;C)",
+                    String(simulated.fridge_temperature_c, 1), "-20", "100",
+                    "0.1");
+  appendNumberInput(html, "sim_attenuation", "Verg&auml;rgrad (%)",
+                    String(simulated.attenuation_percent, 0), "0", "100",
+                    "1");
+  appendNumberInput(html, "sim_end_attenuation",
+                    "Endverg&auml;rgrad / Farbwechsel (%)",
+                    String(simulated.end_attenuation_percent, 0), "0", "100",
+                    "1");
+  html += F(
+      "</div></div><div class='actions'><button type='submit'>Speichern</button>"
+      "<a href='/display'>Display ansehen</a><a href='/'>Home</a></div></form>"
+      "</main><script>(function(){var source=document.getElementById('brew_source'),"
+      "fields=document.getElementById('simulation');function update(){"
+      "fields.style.display=source.value==='simulated'?'contents':'none';}"
+      "source.addEventListener('change',update);update();})();</script>"
+      "</body></html>");
+  s_wm.server->send(200, "text/html; charset=utf-8", html);
+}
+
+void handleBrewSettingsSaved() {
+  if (!s_wm.server || !settingsWriteAuthenticated()) {
+    return;
+  }
+  WebServer& web = *s_wm.server;
+  const bool saved = services::brew::saveFromPortal(
+      web.arg("brew_source").c_str(), web.arg("sim_batch_name").c_str(),
+      web.arg("sim_recipe_name").c_str(), web.arg("sim_status").c_str(),
+      web.arg("sim_batch_number").c_str(), web.arg("sim_brew_day").c_str(),
+      web.arg("sim_plato").c_str(), web.arg("sim_target_plato").c_str(),
+      web.arg("sim_target_temp").c_str(), web.arg("sim_fridge_temp").c_str(),
+      web.arg("sim_attenuation").c_str(),
+      web.arg("sim_end_attenuation").c_str());
+  if (!saved) {
+    web.send(400, "text/html; charset=utf-8",
+             "<!doctype html><html lang='de'><meta charset='utf-8'>"
+             "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+             "<body style='font-family:Segoe UI,Arial,sans-serif;background:#0d151e;"
+             "color:#d7e0e9;padding:2rem'><h2>Ungültige Simulationswerte</h2>"
+             "<p>Bitte Eingabebereiche prüfen.</p><a style='color:#8eb5c5' "
+             "href='/brew'>Zurück</a></body></html>");
+    return;
+  }
+  services::weather::requestRefresh();
+  web.sendHeader("Location", "/brew", true);
+  web.send(303, "text/plain", "Saved");
 }
 
 constexpr int kCoordParamLen = 20;
@@ -648,7 +856,7 @@ void savePortalParamsFromRequest(WebServer& web) {
 }
 
 void handleSettingsSaved() {
-  if (!s_wm.server) {
+  if (!s_wm.server || !settingsWriteAuthenticated()) {
     return;
   }
 
@@ -685,6 +893,8 @@ void attachSettingsRoutes() {
   });
   s_wm.server->on("/display", HTTP_GET, handleDisplayPage);
   s_wm.server->on("/display.bmp", HTTP_GET, handleDisplayBmp);
+  s_wm.server->on("/brew", HTTP_GET, handleBrewSettingsPage);
+  s_wm.server->on("/brew-save", HTTP_POST, handleBrewSettingsSaved);
   // Register before WiFiManager's built-in /paramsave handler so the custom
   // confirmation can redirect back to Setup.
   s_wm.server->on("/paramsave", HTTP_POST, handleSettingsSaved);
@@ -821,7 +1031,9 @@ void resetWifiCredentials() {
   services::location::clear();
   ui::radar::unitsReset();
   services::settings::clear();
-  Serial.println("WiFi credentials, location, units, and display settings cleared");
+  services::brew::clear();
+  Serial.println(
+      "WiFi credentials, location, units, display, and brew settings cleared");
 }
 
 void onConfigPortalApStarted(WiFiManager*) {
@@ -854,7 +1066,7 @@ void ensureWifiManager() {
                            IPAddress(255, 255, 255, 0));
   s_wm.setHostname(config::kPortalHostname);
   s_wm.setCustomHeadElement(kPortalGlobalStyle);
-  s_wm.setTitle("Plane Radar");
+  s_wm.setTitle("BrewSphere");
   s_wm.setAPCallback(onConfigPortalApStarted);
   attachPortalParams(s_wm);
   services::ota::configure(s_wm, attachSettingsRoutes);

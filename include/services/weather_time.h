@@ -23,12 +23,15 @@ struct BrewData {
   float estimated_final_gravity = 0.0f;
   float measured_final_gravity = 0.0f;
   float measured_attenuation_percent = 0.0f;
+  float end_attenuation_percent = 0.0f;
   uint64_t reading_time_ms = 0;
 };
 
 /** Start UTC NTP synchronization. Safe to call after every reconnect. */
 void begin();
 void setPollFn(PollFn fn);
+/** Force the configured data source to be applied in the next main loop. */
+void requestRefresh();
 
 /**
  * Refresh current conditions and the location's UTC offset when due.

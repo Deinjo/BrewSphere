@@ -4,6 +4,11 @@
 
 namespace ui {
 
+/** Reserve the optional full-frame sprite before Wi-Fi/TLS use the heap. */
+bool brewDisplayInit();
+/** Whether the web-preview framebuffer is available. */
+bool brewDisplayFrameAvailable();
+
 /** Draw the first BrewSphere fermentation gauge view. */
 void brewDisplayDraw();
 

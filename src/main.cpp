@@ -1,5 +1,5 @@
 /**
- * Plane Radar — WiFi setup, then radar UI on the round GC9A01 display.
+ * BrewSphere - fermentation status on the round GC9A01 display.
  */
 
 #include <Arduino.h>
@@ -8,6 +8,7 @@
 #include "config.h"
 #include "hardware/display.h"
 #include "services/adsb_client.h"
+#include "services/brew_settings.h"
 #include "services/display_settings.h"
 #include "services/ota_update.h"
 #include "services/radar_location.h"
@@ -51,15 +52,21 @@ void setup() {
   Serial.begin(115200);
   delay(500);
   Serial.println();
-  Serial.println("Plane Radar");
+  Serial.println("BrewSphere");
 
   bootButtonInit();
   displayInit();
+  statusScreenBrand();
+  delay(1000);
+  statusScreenBrandWordmark();
+  delay(1000);
+  ui::brewDisplayInit();
   if (wifiShowsSetupScreenOnBoot()) {
     statusScreenPortal();
   }
   services::location::init();
   services::settings::init();
+  services::brew::init();
   services::weather::setPollFn(wifiLoop);
 
   if (wifiSetupConnect()) {

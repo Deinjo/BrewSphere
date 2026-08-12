@@ -37,11 +37,11 @@
 namespace config {
 
 // --- Wi-Fi portal ---
-constexpr char kPortalApName[] = "PlaneRadar-Setup";
+constexpr char kPortalApName[] = "BrewSphere-Setup";
 constexpr char kPortalIp[] = "192.168.4.1";
-/** mDNS host (no ".local" suffix); browser: http://plane-radar.local */
-constexpr char kPortalHostname[] = "plane-radar";
-constexpr char kPortalHostUrl[] = "plane-radar.local";
+/** mDNS host (no ".local" suffix); browser: http://brewsphere.local */
+constexpr char kPortalHostname[] = "brewsphere";
+constexpr char kPortalHostUrl[] = "brewsphere.local";
 /** Optional compiled fallback Wi-Fi credentials. Empty SSID disables fallback. */
 constexpr char kWifiFallbackSSID[] = PLANE_RADAR_WIFI_FALLBACK_SSID;
 constexpr char kWifiFallbackPass[] = PLANE_RADAR_WIFI_FALLBACK_PASS;
@@ -107,7 +107,7 @@ constexpr unsigned long kBrewfatherRequestTimeoutMs = 6000UL;
 // --- User-facing defaults ---
 constexpr char kOtaUsername[] = "admin";
 /** Change this in the web settings before exposing the device to other users. */
-constexpr char kDefaultOtaPassword[] = "plane-radar";
+constexpr char kDefaultOtaPassword[] = "brewsphere";
 
 // --- UI colors (RGB565) — status screens ---
 constexpr uint16_t kColorBlack = 0x0000;

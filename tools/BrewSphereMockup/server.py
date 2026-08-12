@@ -76,6 +76,12 @@ class Handler(SimpleHTTPRequestHandler):
                 reading = api_json(f"/batches/{batch_id}/readings/last")
                 sg = float(reading.get("sg") or 0)
                 estimated_fg = float(detail.get("estimatedFg") or 0)
+                measured_og = float(detail.get("measuredOg") or 0)
+                measured_attenuation = float(detail.get("measuredAttenuation") or 0)
+                end_attenuation = measured_attenuation
+                if measured_og > 1 and estimated_fg > 0:
+                    end_attenuation = ((measured_og - estimated_fg) /
+                                       (measured_og - 1) * 100)
                 brew_day = 0
                 if detail.get("brewDate"):
                     start = datetime.fromtimestamp(detail["brewDate"] / 1000, timezone.utc)
@@ -91,8 +97,8 @@ class Handler(SimpleHTTPRequestHandler):
                     "fridge_temperature": reading.get("fridgeTemp", 0),
                     "plato": round(plato_from_sg(sg), 1) if sg else 0,
                     "target_plato": round(plato_from_sg(estimated_fg), 1) if estimated_fg else 0,
-                    "attenuation": detail.get("measuredAttenuation", 0),
-                    "end_attenuation": detail.get("measuredAttenuation", 0),
+                    "attenuation": measured_attenuation,
+                    "end_attenuation": round(end_attenuation, 1),
                 }
                 self.send_json(response)
             except (HTTPError, URLError, RuntimeError, KeyError) as error:

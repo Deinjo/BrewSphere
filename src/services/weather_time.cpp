@@ -13,6 +13,7 @@
 #include <sys/time.h>
 
 #include "config.h"
+#include "services/brew_settings.h"
 #include "services/display_settings.h"
 
 namespace services::weather {
@@ -30,6 +31,8 @@ unsigned long s_last_attempt_ms = 0;
 double s_last_latitude = 999.0;
 double s_last_longitude = 999.0;
 PollFn s_poll_fn = nullptr;
+bool s_refresh_requested = false;
+brew::SourceMode s_last_source_mode = brew::SourceMode::kBrewfatherApi;
 
 bool clockValid() { return time(nullptr) >= kMinimumValidEpoch; }
 
@@ -101,7 +104,8 @@ String basicAuthHeader() {
   return header;
 }
 
-bool getJson(const String& url, const String& authorization, JsonDocument& doc) {
+bool getJson(const String& url, const String& authorization, JsonDocument& doc,
+             const JsonDocument* filter = nullptr) {
   WiFiClientSecure client;
   client.setInsecure();
 
@@ -114,15 +118,23 @@ bool getJson(const String& url, const String& authorization, JsonDocument& doc) 
   http.setTimeout(config::kBrewfatherRequestTimeoutMs);
   http.addHeader("Authorization", authorization);
 
+  pollNetwork();
   const int code = http.GET();
+  pollNetwork();
   if (code != HTTP_CODE_OK) {
     Serial.printf("brewfather: HTTP %d\n", code);
     http.end();
     return false;
   }
 
-  const DeserializationError error = deserializeJson(doc, http.getStream());
+  const DeserializationError error =
+      filter != nullptr
+          ? deserializeJson(doc, http.getStream(),
+                            DeserializationOption::Filter(
+                                filter->as<JsonVariantConst>()))
+          : deserializeJson(doc, http.getStream());
   http.end();
+  pollNetwork();
   if (error) {
     Serial.printf("brewfather: JSON parse error: %s\n", error.c_str());
     return false;
@@ -179,6 +191,56 @@ void copyDisplayName(const JsonVariantConst& value, char* target,
   snprintf(target, target_len, "%s", value | "");
 }
 
+float specificGravityFromPlato(float plato) {
+  float specific_gravity =
+      1.0f + plato / (258.6f - (plato / 258.2f) * 227.1f);
+  for (int iteration = 0; iteration < 4; ++iteration) {
+    const float calculated =
+        -616.868f + 1111.14f * specific_gravity -
+        630.272f * specific_gravity * specific_gravity +
+        135.997f * specific_gravity * specific_gravity * specific_gravity;
+    const float derivative =
+        1111.14f - 1260.544f * specific_gravity +
+        407.991f * specific_gravity * specific_gravity;
+    specific_gravity -= (calculated - plato) / derivative;
+  }
+  return specific_gravity;
+}
+
+bool applySimulatedValues() {
+  const brew::SimulatedValues& simulated = brew::simulatedValues();
+  BrewData next_data;
+  next_data.valid = true;
+  snprintf(next_data.batch_id, sizeof(next_data.batch_id), "simulated");
+  snprintf(next_data.batch_name, sizeof(next_data.batch_name), "%s",
+           simulated.batch_name);
+  snprintf(next_data.recipe_name, sizeof(next_data.recipe_name), "%s",
+           simulated.recipe_name);
+  snprintf(next_data.status, sizeof(next_data.status), "%s", simulated.status);
+  next_data.batch_number = simulated.batch_number;
+  next_data.brew_day = simulated.brew_day;
+  next_data.temperature_c = simulated.fridge_temperature_c;
+  next_data.target_temperature_c = simulated.target_temperature_c;
+  next_data.fridge_temperature_c = simulated.fridge_temperature_c;
+  next_data.specific_gravity = specificGravityFromPlato(simulated.plato);
+  next_data.original_gravity = next_data.specific_gravity;
+  next_data.estimated_final_gravity =
+      specificGravityFromPlato(simulated.target_plato);
+  next_data.measured_final_gravity = next_data.specific_gravity;
+  next_data.measured_attenuation_percent = simulated.attenuation_percent;
+  next_data.end_attenuation_percent = simulated.end_attenuation_percent;
+
+  s_data = next_data;
+  s_temperature_c = next_data.temperature_c;
+  s_fridge_temperature_c = next_data.fridge_temperature_c;
+  s_valid = true;
+  Serial.printf(
+      "brew simulation: %.1f P, target %.1f P, attenuation %.0f/%.0f%%\n",
+      simulated.plato, simulated.target_plato,
+      simulated.attenuation_percent, simulated.end_attenuation_percent);
+  return true;
+}
+
 bool fetch(double, double) {
   if (config::kBrewfatherUserId[0] == '\0' ||
       config::kBrewfatherApiKey[0] == '\0') {
@@ -193,9 +255,12 @@ bool fetch(double, double) {
   }
 
   JsonDocument batches;
+  JsonDocument batches_filter;
+  batches_filter[0]["_id"] = true;
   String batches_url = config::kBrewfatherApiBase;
-  batches_url += "/batches?status=Fermenting&limit=50";
-  if (!getJson(batches_url, authorization, batches)) {
+  batches_url +=
+      "/batches?status=Fermenting&limit=1&order_by=brewDate&order_by_direction=desc";
+  if (!getJson(batches_url, authorization, batches, &batches_filter)) {
     return false;
   }
 
@@ -222,7 +287,20 @@ bool fetch(double, double) {
       "?include=estimatedFg,measuredOg,measuredFg,measuredAttenuation";
 
   JsonDocument batch;
-  if (!getJson(batch_url, authorization, batch)) {
+  JsonDocument batch_filter;
+  batch_filter["_id"] = true;
+  batch_filter["description"] = true;
+  batch_filter["name"] = true;
+  batch_filter["recipe"]["name"] = true;
+  batch_filter["status"] = true;
+  batch_filter["batchNo"] = true;
+  batch_filter["measuredOg"] = true;
+  batch_filter["estimatedFg"] = true;
+  batch_filter["measuredFg"] = true;
+  batch_filter["measuredAttenuation"] = true;
+  batch_filter["brewDate"] = true;
+  batch_filter["events"][0]["description"] = true;
+  if (!getJson(batch_url, authorization, batch, &batch_filter)) {
     return false;
   }
 
@@ -253,6 +331,20 @@ bool fetch(double, double) {
   next_data.measured_final_gravity = batch["measuredFg"] | 0.0f;
   next_data.measured_attenuation_percent =
       batch["measuredAttenuation"] | 0.0f;
+  if (next_data.original_gravity > 1.0f &&
+      next_data.estimated_final_gravity > 0.0f) {
+    const float end_attenuation =
+        (next_data.original_gravity - next_data.estimated_final_gravity) /
+        (next_data.original_gravity - 1.0f) * 100.0f;
+    next_data.end_attenuation_percent =
+        std::isfinite(end_attenuation) && end_attenuation >= 0.0f &&
+                end_attenuation <= 100.0f
+            ? end_attenuation
+            : next_data.measured_attenuation_percent;
+  } else {
+    next_data.end_attenuation_percent =
+        next_data.measured_attenuation_percent;
+  }
 
   const uint64_t brew_date_ms = batch["brewDate"] | static_cast<uint64_t>(0);
   if (brew_date_ms > 0 && clockValid()) {
@@ -273,12 +365,23 @@ bool fetch(double, double) {
   reading_url += "/readings/last";
 
   JsonDocument reading;
-  if (!getJson(reading_url, authorization, reading)) {
+  JsonDocument reading_filter;
+  reading_filter["temp"] = true;
+  reading_filter["fridgeTemp"] = true;
+  reading_filter["temp_target"] = true;
+  reading_filter["sg"] = true;
+  reading_filter["time"] = true;
+  reading_filter["type"] = true;
+  if (!getJson(reading_url, authorization, reading, &reading_filter)) {
     return false;
   }
 
   if (!reading["temp"].is<float>()) {
     Serial.println("brewfather: reading has no numeric temp field");
+    return false;
+  }
+  if (!reading["sg"].is<float>()) {
+    Serial.println("brewfather: reading has no numeric sg field");
     return false;
   }
 
@@ -288,12 +391,10 @@ bool fetch(double, double) {
                                : NAN;
   next_data.temperature_c = s_temperature_c;
   next_data.target_temperature_c = reading["temp_target"].is<float>()
-                                       ? reading["temp_target"].as<float>()
-                                       : 0.0f;
+                                        ? reading["temp_target"].as<float>()
+                                        : NAN;
   next_data.fridge_temperature_c = s_fridge_temperature_c;
-  next_data.specific_gravity = reading["sg"].is<float>()
-                                   ? reading["sg"].as<float>()
-                                   : 0.0f;
+  next_data.specific_gravity = reading["sg"].as<float>();
   next_data.reading_time_ms = reading["time"] | static_cast<uint64_t>(0);
   s_data = next_data;
   s_valid = true;
@@ -315,20 +416,37 @@ void begin() {
 
 void setPollFn(PollFn fn) { s_poll_fn = fn; }
 
+void requestRefresh() { s_refresh_requested = true; }
+
 bool refreshIfDue(double latitude, double longitude, bool force) {
   begin();
   const unsigned long now = millis();
+  const brew::SourceMode source_mode = brew::sourceMode();
+  const bool source_changed = source_mode != s_last_source_mode;
   const bool location_changed =
       fabs(latitude - s_last_latitude) > 0.0001 ||
       fabs(longitude - s_last_longitude) > 0.0001;
-  if (!force && !location_changed && s_last_attempt_ms != 0 &&
+  if (!force && !s_refresh_requested && !source_changed && !location_changed &&
+      s_last_attempt_ms != 0 &&
        now - s_last_attempt_ms < config::kBrewfatherFetchIntervalMs) {
     return false;
   }
+  s_refresh_requested = false;
+  s_last_source_mode = source_mode;
   s_last_attempt_ms = now;
   s_last_latitude = latitude;
   s_last_longitude = longitude;
-  return fetch(latitude, longitude);
+  if (source_mode == brew::SourceMode::kSimulated) {
+    return applySimulatedValues();
+  }
+  if (fetch(latitude, longitude)) {
+    return true;
+  }
+  s_data = BrewData{};
+  s_temperature_c = 0.0f;
+  s_fridge_temperature_c = NAN;
+  s_valid = false;
+  return true;
 }
 
 bool valid() { return s_valid; }
