@@ -24,11 +24,21 @@ struct SimulatedValues {
   float end_attenuation_percent = 0.0f;
 };
 
+struct BrewfatherCredentials {
+  char user_id[96] = {};
+  char api_key[160] = {};
+};
+
 /** Load the Brewfather/simulation source and simulated values from NVS. */
 void init();
 
 SourceMode sourceMode();
 const SimulatedValues& simulatedValues();
+const BrewfatherCredentials& brewfatherCredentials();
+
+/** Update Brewfather credentials in RAM and optionally persist them in NVS. */
+bool saveCredentialsFromPortal(const char* user_id, const char* api_key,
+                               bool persist_values = true);
 
 /** Validate values received from the web form and optionally persist them. */
 bool saveFromPortal(const char* source, const char* batch_name,

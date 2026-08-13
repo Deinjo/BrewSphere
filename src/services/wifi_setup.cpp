@@ -281,12 +281,14 @@ void handleBrewSettingsPage() {
   }
   const services::brew::SimulatedValues& simulated =
       services::brew::simulatedValues();
+  const services::brew::BrewfatherCredentials& credentials =
+      services::brew::brewfatherCredentials();
   const bool simulation = services::brew::sourceMode() ==
                           services::brew::SourceMode::kSimulated;
   ensureBrewCsrfToken();
 
   String html;
-  html.reserve(7000);
+   html.reserve(8500);
   html += F(
       "<!doctype html><html lang='de'><head><meta charset='utf-8'>"
       "<meta name='viewport' content='width=device-width,initial-scale=1'>"
@@ -333,8 +335,10 @@ void handleBrewSettingsPage() {
   html += F(">Simulierte Werte</option></select>"
             "<input type='hidden' name='csrf' value='");
   html += s_brew_csrf_token;
-  html += F("'></div><div id='simulation' class='simulation'>"
-            "<p class='hint'>Änderungen werden live auf dem Display und in der "
+   html += F("'></div><div class='full'><label for='brew_user_id'>Brewfather User-ID</label><input id='brew_user_id' name='brew_user_id' type='text' maxlength='95' value='");
+   appendHtmlEscaped(html, credentials.user_id);
+   html += F("' autocomplete='username'></div><div class='full'><label for='brew_api_key'>Brewfather API-Key</label><input id='brew_api_key' name='brew_api_key' type='password' maxlength='159' value='' placeholder='Leer lassen, um den gespeicherten Key zu behalten' autocomplete='current-password'></div><div class='hint'>Zugangsdaten werden nur auf dem Gerät gespeichert. Der API-Key wird aus Sicherheitsgründen nicht wieder angezeigt.</div><div id='simulation' class='simulation'>"
+             "<p class='hint'>Änderungen werden live auf dem Display und in der "
             "Webvorschau verwendet. Speichern übernimmt sie dauerhaft.</p>");
   html += F("<label class='check'><input id='sim_demo' name='sim_demo' "
             "type='checkbox'");
@@ -396,6 +400,13 @@ void handleBrewSettingsPage() {
 }
 
 bool applyBrewSettingsRequest(WebServer& web, bool persist_values) {
+  const bool brewfather_requested = web.arg("brew_source") != "simulated";
+  const bool credentials_valid = services::brew::saveCredentialsFromPortal(
+      web.arg("brew_user_id").c_str(), web.arg("brew_api_key").c_str(),
+      persist_values);
+  if (brewfather_requested && !credentials_valid) {
+    return false;
+  }
   return services::brew::saveFromPortal(
       web.arg("brew_source").c_str(), web.arg("sim_batch_name").c_str(),
       web.arg("sim_recipe_name").c_str(), web.arg("sim_status").c_str(),
@@ -439,8 +450,8 @@ void handleBrewSettingsSaved() {
              "<!doctype html><html lang='de'><meta charset='utf-8'>"
              "<meta name='viewport' content='width=device-width,initial-scale=1'>"
              "<body style='font-family:Segoe UI,Arial,sans-serif;background:#0d151e;"
-             "color:#d7e0e9;padding:2rem'><h2>Ungültige Simulationswerte</h2>"
-             "<p>Bitte Eingabebereiche prüfen.</p><a style='color:#8eb5c5' "
+              "color:#d7e0e9;padding:2rem'><h2>Ungültige Brewfather- oder Simulationsdaten</h2>"
+              "<p>Bitte Zugangsdaten und Eingabebereiche prüfen.</p><a style='color:#8eb5c5' "
              "href='/brew'>Zurück</a></body></html>");
     return;
   }

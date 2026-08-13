@@ -4,8 +4,11 @@
 
 #include <cerrno>
 #include <cmath>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
+
+#include "config.h"
 
 namespace services::brew {
 namespace {
@@ -24,9 +27,19 @@ constexpr char kKeyFridgeTemperature[] = "fridgeTemp";
 constexpr char kKeyAttenuation[] = "attenuation";
 constexpr char kKeyEndAttenuation[] = "endAtten";
 constexpr char kKeyDemoMode[] = "demoMode";
+constexpr char kKeyBrewfatherUserId[] = "bfUserId";
+constexpr char kKeyBrewfatherApiKey[] = "bfApiKey";
 
 SourceMode s_source_mode = SourceMode::kBrewfatherApi;
 SimulatedValues s_simulated;
+BrewfatherCredentials s_brewfather;
+
+void copyValue(const char* value, char* output, size_t output_len) {
+  if (output_len == 0) {
+    return;
+  }
+  snprintf(output, output_len, "%s", value != nullptr ? value : "");
+}
 
 void copyDisplayText(const char* value, char* output, size_t output_len,
                      const char* fallback) {
@@ -103,6 +116,10 @@ void loadDefaults() {
   s_simulated.fridge_temperature_c = 3.4f;
   s_simulated.attenuation_percent = 81.0f;
   s_simulated.end_attenuation_percent = 84.0f;
+  copyValue(config::kBrewfatherUserId, s_brewfather.user_id,
+            sizeof(s_brewfather.user_id));
+  copyValue(config::kBrewfatherApiKey, s_brewfather.api_key,
+            sizeof(s_brewfather.api_key));
 }
 
 float validatedFloat(float value, float minimum, float maximum,
@@ -153,6 +170,8 @@ void persist() {
   preferences.putFloat(kKeyAttenuation, s_simulated.attenuation_percent);
   preferences.putFloat(kKeyEndAttenuation,
                        s_simulated.end_attenuation_percent);
+  preferences.putString(kKeyBrewfatherUserId, s_brewfather.user_id);
+  preferences.putString(kKeyBrewfatherApiKey, s_brewfather.api_key);
   preferences.end();
 }
 
@@ -196,6 +215,10 @@ void init() {
       preferences.getFloat(kKeyAttenuation, s_simulated.attenuation_percent);
   s_simulated.end_attenuation_percent = preferences.getFloat(
       kKeyEndAttenuation, s_simulated.end_attenuation_percent);
+  value = preferences.getString(kKeyBrewfatherUserId, s_brewfather.user_id);
+  copyValue(value.c_str(), s_brewfather.user_id, sizeof(s_brewfather.user_id));
+  value = preferences.getString(kKeyBrewfatherApiKey, s_brewfather.api_key);
+  copyValue(value.c_str(), s_brewfather.api_key, sizeof(s_brewfather.api_key));
   preferences.end();
   validateLoadedValues();
 }
@@ -203,6 +226,26 @@ void init() {
 SourceMode sourceMode() { return s_source_mode; }
 
 const SimulatedValues& simulatedValues() { return s_simulated; }
+
+const BrewfatherCredentials& brewfatherCredentials() { return s_brewfather; }
+
+bool saveCredentialsFromPortal(const char* user_id, const char* api_key,
+                               bool persist_values) {
+  if (user_id != nullptr && user_id[0] != '\0') {
+    copyValue(user_id, s_brewfather.user_id, sizeof(s_brewfather.user_id));
+  }
+  // An empty API-key field means "keep the currently stored key".
+  if (api_key != nullptr && api_key[0] != '\0') {
+    copyValue(api_key, s_brewfather.api_key, sizeof(s_brewfather.api_key));
+  }
+  if (s_brewfather.user_id[0] == '\0' || s_brewfather.api_key[0] == '\0') {
+    return false;
+  }
+  if (persist_values) {
+    persist();
+  }
+  return true;
+}
 
 bool saveFromPortal(const char* source, const char* batch_name,
                     const char* recipe_name, const char* status,

@@ -84,10 +84,10 @@ void seedClockFromApiTime(const char* local_iso_time, int32_t utc_offset) {
 }
 
 String basicAuthHeader() {
-  char credentials[sizeof(config::kBrewfatherUserId) +
-                   sizeof(config::kBrewfatherApiKey) + 2] = {};
-  snprintf(credentials, sizeof(credentials), "%s:%s", config::kBrewfatherUserId,
-           config::kBrewfatherApiKey);
+  const brew::BrewfatherCredentials& stored = brew::brewfatherCredentials();
+  char credentials[sizeof(stored.user_id) + sizeof(stored.api_key) + 2] = {};
+  snprintf(credentials, sizeof(credentials), "%s:%s", stored.user_id,
+           stored.api_key);
 
   unsigned char encoded[sizeof(credentials) * 2] = {};
   size_t encoded_len = 0;
@@ -275,8 +275,9 @@ bool applySimulatedValues() {
 }
 
 bool fetch(double, double) {
-  if (config::kBrewfatherUserId[0] == '\0' ||
-      config::kBrewfatherApiKey[0] == '\0') {
+  const brew::BrewfatherCredentials& credentials =
+      brew::brewfatherCredentials();
+  if (credentials.user_id[0] == '\0' || credentials.api_key[0] == '\0') {
     Serial.println("brewfather: credentials are not configured");
     return false;
   }
