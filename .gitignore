@@ -23,6 +23,11 @@ __pycache__/
 
 # Private Brewfather credentials
 /tools/TestingBrewfatherApi/config_local.py
+/tools/TestingBrewfatherApi/config_local.h
+/tools/TestingBrewfatherApi/dist/config_local.h
+/tools/TestingBrewfatherApi/build/
+/tools/TestingBrewfatherApi/dist/
+/tools/TestingBrewfatherApi/*.spec
 /tools/TestingBrewfatherApi/brewfather_response*.json
 /tools/TestingBrewfatherApi/brewfather_response*.html
 /tools/BrewSphereMockup/config_local.py
