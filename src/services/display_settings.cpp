@@ -399,6 +399,16 @@ void saveFromPortal(const char* footer_checkbox, const char* weather_checkbox,
                 s_weather_enabled ? "on" : "off", s_text_scale_percent);
 }
 
+void saveOtaPasswordFromPortal(const char* ota_password_value) {
+  char password[kOtaPasswordMaxLen + 1] = {};
+  copyCleanText(ota_password_value, password, sizeof(password));
+  if (password[0] != '\0') {
+    strncpy(s_ota_password, password, sizeof(s_ota_password) - 1);
+    s_ota_password[sizeof(s_ota_password) - 1] = '\0';
+    persist();
+  }
+}
+
 void saveColorsFromPortal(const char* background, const char* grid,
                           const char* label, const char* center,
                           const char* aircraft, const char* track_vector,

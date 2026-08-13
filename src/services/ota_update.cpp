@@ -191,8 +191,7 @@ void configure(WiFiManager& manager, AdditionalRoutesFn additional_routes) {
   manager.setCustomMenuHTML(
       "<form action='/firmware' method='get'><button>Firmware update</button>"
       "</form><br/>\n");
-  const char* menu[] = {"wifi", "param", "info", "custom",
-                        "sep",  "restart", "exit"};
+  const char* menu[] = {"wifi", "custom", "sep", "restart", "exit"};
   manager.setMenu(menu, sizeof(menu) / sizeof(menu[0]));
   manager.setWebServerCallback(attachRoutes);
 }

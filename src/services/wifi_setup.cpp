@@ -60,6 +60,19 @@ void initBootButton() {
 
 namespace {
 
+constexpr char kEmblemSvg[] PROGMEM = R"SVG(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="BrewSphere emblem">
+<defs><clipPath id="beerClip"><path d="M219 207 C220 252 224 301 229 339 Q256 348 283 339 C288 301 292 252 293 207 Z"/></clipPath></defs>
+<circle cx="256" cy="256" r="246" fill="#0B3552"/><circle cx="256" cy="256" r="222" fill="none" stroke="#06264A" stroke-width="48"/>
+<circle cx="256" cy="256" r="222" fill="none" stroke="#FF9D00" stroke-width="48" stroke-dasharray="174.4 1220.5" transform="rotate(-45 256 256)"/>
+<g stroke="#FFF1C9" stroke-width="10" stroke-linecap="butt"><path d="M394.6 117.4 L430 82"/><path d="M452 256 L502 256"/><path d="M394.6 394.6 L430 430"/><path d="M117.4 394.6 L82 430"/><path d="M60 256 L10 256"/><path d="M117.4 117.4 L82 82"/></g>
+<circle cx="256" cy="256" r="246" fill="none" stroke="#FFF1C9" stroke-width="6"/><circle cx="256" cy="256" r="177" fill="none" stroke="#FFF1C9" stroke-width="11"/>
+<g fill="none" stroke="#FFF1C9" stroke-width="6" stroke-linecap="round"><path d="M169 139 C111 194 111 318 169 373"/><path d="M343 139 C401 194 401 318 343 373"/></g>
+<g clip-path="url(#beerClip)"><path d="M205 273 Q250 286 307 270 L307 365 L205 365 Z" fill="#FF9D00"/><path d="M205 329 Q256 347 307 326 L307 365 L205 365 Z" fill="#E87300"/></g>
+<path d="M205 171 C205 151 222 142 239 148 C248 137 267 137 276 148 C294 142 311 151 311 171 Z" fill="#FFF1C9"/>
+<path d="M207 188 C206 237 210 286 220 350 Q256 365 292 350 C302 286 306 237 305 188" fill="none" stroke="#FFF1C9" stroke-width="13" stroke-linecap="square" stroke-linejoin="round"/><path d="M226 340 Q256 350 286 340" fill="none" stroke="#FFF1C9" stroke-width="8"/>
+<circle cx="273" cy="237" r="12" fill="#41DEDE" stroke="#FFF1C9" stroke-width="3"/><circle cx="249" cy="267" r="9" fill="#FF9D00" stroke="#FFF1C9" stroke-width="2"/><circle cx="267" cy="286" r="10" fill="#BFEFFF" stroke="#FFF1C9" stroke-width="2"/>
+</svg>)SVG";
+
 constexpr char kPortalGlobalStyle[] =
     "<style>"
     "*{box-sizing:border-box}"
@@ -95,25 +108,57 @@ constexpr char kPortalGlobalStyle[] =
     "background:#38596b;color:#eef5f8;border:1px solid #5e8191;"
     "border-radius:6px;text-decoration:none;font-weight:600}"
     ".home-link:hover{background:#486f80;border-color:#83a8b7}"
-    ".portal-menu-link{display:block;width:calc(100% - 32px);margin:16px;"
+     ".portal-menu-link{display:block;width:100%;margin:16px 0;"
     "padding:12px;text-align:center;background:#38596b;color:#eef5f8;"
     "border:1px solid #5e8191;border-radius:6px;text-decoration:none;"
     "font-size:1.05rem;font-weight:600}"
-    ".portal-menu-link:hover{background:#486f80;border-color:#83a8b7}"
-    "@media(max-width:520px){body{padding:12px}form{padding:16px}}"
+     ".portal-menu-link:hover{background:#486f80;border-color:#83a8b7}"
+     ".portal-action-form{padding:0!important;background:transparent!important;"
+     "border:0!important;border-radius:0!important;box-shadow:none!important;"
+     "margin:16px 0!important}"
+     ".portal-action-form button,.portal-menu-link{display:block;width:100%;"
+     "min-height:58px;padding:12px 16px;text-align:center;font-size:1.05rem;"
+     "font-weight:600}"
+     ".brand-banner{display:flex;align-items:center;justify-content:center;gap:16px;"
+     "width:100%;margin:0 0 24px;padding:14px 18px;background:#141f2a;"
+     "border:1px solid #2a3a49;border-radius:12px;box-shadow:0 12px 32px #0005;"
+     "color:#fff1c9;font-size:1.45rem;font-weight:600;letter-spacing:.02em}"
+     ".brand-banner img{width:64px;height:64px;display:block}"
+     ".device-name{margin-bottom:6px;color:#edf3f8;font-size:1.15rem;"
+     "font-weight:600}"
+     ".portal-nav{width:100%;margin:0 0 24px}.portal-divider{"
+     "border:0;border-top:1px solid #2a3a49;margin:24px 0 0}"
+     "@media(max-width:520px){body{padding:12px}form{padding:16px}}"
     "</style>"
     "<script>document.addEventListener('DOMContentLoaded',function(){"
-    "var w=document.querySelector('.wrap');if(!w)return;"
-    "if(location.pathname==='/' ){"
-    "function l(h,t){var r=document.createElement('div');r.className='c';"
-    "var a=document.createElement('a');a.href=h;a.textContent=t;"
-    "a.className='portal-menu-link';r.appendChild(a);w.appendChild(r);}"
-    "l('/display','Display');l('/brew','Brewfather / Simulation');return;}"
+     "var w=document.querySelector('.wrap');if(!w)return;"
+     "if(location.pathname==='/' ){"
+     "var b=document.createElement('div');b.className='brand-banner';"
+     "var i=document.createElement('img');i.src='/emblem.svg';i.alt='BrewSphere';"
+     "var t=document.createElement('span');t.textContent='BrewSphere';"
+     "b.appendChild(i);b.appendChild(t);w.prepend(b);"
+     "var nav=document.createElement('div');nav.className='portal-nav';"
+     "w.insertBefore(nav,w.children[1]);"
+     "function l(h,t){var r=document.createElement('div');r.className='c portal-action';"
+     "var a=document.createElement('a');a.href=h;a.textContent=t;"
+     "a.className='portal-menu-link';r.appendChild(a);nav.appendChild(r);}"
+     "l('/display','Display');l('/brew','Brewfather / Simulation');"
+     "var divider=document.createElement('hr');divider.className='portal-divider';nav.appendChild(divider);"
+     "w.querySelectorAll('form').forEach(function(f){"
+     "if(!f.querySelector('input,select,textarea'))f.classList.add('portal-action-form');});"
+     "var blocks=Array.from(w.children),status=blocks.find(function(e){"
+     "return /Connected to|Not connected/i.test(e.textContent);}),devicePanel=blocks.find(function(e){"
+     "return e!==status&&/esp32/i.test(e.textContent)&&/\\d{1,3}(?:\\.\\d{1,3}){3}/.test(e.textContent);});"
+     "if(status){var title=w.querySelector('h1');"
+     "if(title&&/^BrewSphere$/i.test(title.textContent.trim()))title.remove();"
+     "if(devicePanel){var device=document.createElement('div');device.className='device-name';"
+     "device.textContent=devicePanel.textContent.trim();status.prepend(device);devicePanel.remove();}"
+     "w.appendChild(status);}return;}"
     "var a=document.createElement('a');a.href='/';a.textContent='Home';"
     "a.className='home-link';w.prepend(a);"
     "});</script>";
 
-/** Separate from planeradar prefs (rangeInit) to avoid NVS handle conflicts. */
+/** Separate WiFiManager namespace for the force-portal flag. */
 constexpr char kWifiPrefsNamespace[] = "wifi";
 constexpr char kPrefsForcePortalKey[] = "portal";
 
@@ -846,37 +891,8 @@ void refreshPortalParamDefaults() {
 }
 
 void onPortalParamsSaved() {
-  if (!services::location::saveFromStrings(s_param_lat.getValue(),
-                                           s_param_lon.getValue())) {
-    Serial.println("Invalid lat/lon in portal — keeping previous location");
-  }
-  ui::radar::saveMilesFromPortal(s_param_miles.getValue());
-  ui::radar::saveRunwaysFromPortal(s_param_runways.getValue());
-  ui::radar::saveRangeFromPortal(s_param_range.getValue());
-  services::settings::saveFromPortal(
-    s_param_footer.getValue(), s_param_weather.getValue(),
-    s_param_fahrenheit.getValue(),
-    s_param_altitude_metres.getValue(),
-    s_param_clock24.getValue(),
-    s_param_text_scale.getValue(),
-    s_param_ota_password.getValue(),
-    s_param_night_enabled.getValue(),
-    s_param_night_start.getValue(), s_param_night_end.getValue());
-  services::settings::saveColorsFromPortal(
-      s_param_color_background.getValue(), s_param_color_grid.getValue(),
-      s_param_color_label.getValue(), s_param_color_center.getValue(),
-      s_param_color_aircraft.getValue(), s_param_color_track.getValue(),
-      s_param_color_tag_type.getValue(), s_param_color_tag_alt.getValue(),
-      s_param_color_runway.getValue(), s_param_color_runway_label.getValue(),
-      s_param_color_footer.getValue(), s_param_color_road.getValue(),
-      s_param_color_city.getValue(), s_param_color_road_primary.getValue());
-  services::settings::saveVisibilityFromPortal(
-      s_param_show_grid.getValue(), s_param_show_center.getValue(),
-      s_param_show_label.getValue(), s_param_show_aircraft.getValue(),
-      s_param_show_track.getValue(), s_param_show_tag_type.getValue(),
-      s_param_show_tag_alt.getValue(), s_param_show_runway.getValue(),
-      s_param_show_runway_label.getValue(), s_param_show_road.getValue(),
-      s_param_show_city.getValue(), s_param_show_road_primary.getValue());
+  services::settings::saveOtaPasswordFromPortal(
+      s_param_ota_password.getValue());
 }
 
 void savePortalParamsFromRequest(WebServer& web) {
@@ -984,6 +1000,9 @@ void attachSettingsRoutes() {
   s_wm.server->on("/favicon.ico", HTTP_GET, []() {
     s_wm.server->send(204, "text/plain", "");
   });
+  s_wm.server->on("/emblem.svg", HTTP_GET, []() {
+    s_wm.server->send_P(200, "image/svg+xml", kEmblemSvg);
+  });
   s_wm.server->on("/display", HTTP_GET, handleDisplayPage);
   s_wm.server->on("/display.bmp", HTTP_GET, handleDisplayBmp);
   s_wm.server->on("/brew", HTTP_GET, handleBrewSettingsPage);
@@ -995,58 +1014,8 @@ void attachSettingsRoutes() {
 }
 
 void attachPortalParams(WiFiManager& wm) {
-  refreshPortalParamDefaults();
-  wm.addParameter(&s_param_lat);
-  wm.addParameter(&s_param_lon);
-  wm.addParameter(&s_param_miles);
-  wm.addParameter(&s_param_runways);
-  wm.addParameter(&s_param_range_break);
-  wm.addParameter(&s_param_range);
-  wm.addParameter(&s_param_range_output);
-  wm.addParameter(&s_param_footer);
-  wm.addParameter(&s_param_weather);
-  wm.addParameter(&s_param_fahrenheit);
-  wm.addParameter(&s_param_altitude_metres);
-  wm.addParameter(&s_param_clock24);
-  wm.addParameter(&s_param_after_clock_break);
-  wm.addParameter(&s_param_text_scale);
-  wm.addParameter(&s_param_text_scale_output);
-  wm.addParameter(&s_param_night_enabled);
-  wm.addParameter(&s_param_night_break);
-  wm.addParameter(&s_param_night_start);
-  wm.addParameter(&s_param_night_end);
+  s_param_ota_password.setValue("", kOtaPasswordParamLen);
   wm.addParameter(&s_param_ota_password);
-  wm.addParameter(&s_param_color_group_general);
-  wm.addParameter(&s_param_color_background);
-  wm.addParameter(&s_param_color_footer);
-  wm.addParameter(&s_param_color_group_background);
-  wm.addParameter(&s_param_color_road);
-  wm.addParameter(&s_param_show_road);
-  wm.addParameter(&s_param_color_road_primary);
-  wm.addParameter(&s_param_show_road_primary);
-  wm.addParameter(&s_param_color_runway);
-  wm.addParameter(&s_param_show_runway);
-  wm.addParameter(&s_param_color_runway_label);
-  wm.addParameter(&s_param_show_runway_label);
-  wm.addParameter(&s_param_color_city);
-  wm.addParameter(&s_param_show_city);
-  wm.addParameter(&s_param_color_group_grid);
-  wm.addParameter(&s_param_color_grid);
-  wm.addParameter(&s_param_show_grid);
-  wm.addParameter(&s_param_color_center);
-  wm.addParameter(&s_param_show_center);
-  wm.addParameter(&s_param_color_label);
-  wm.addParameter(&s_param_show_label);
-  wm.addParameter(&s_param_color_group_aircraft);
-  wm.addParameter(&s_param_color_aircraft);
-  wm.addParameter(&s_param_show_aircraft);
-  wm.addParameter(&s_param_color_track);
-  wm.addParameter(&s_param_show_track);
-  wm.addParameter(&s_param_color_tag_type);
-  wm.addParameter(&s_param_show_tag_type);
-  wm.addParameter(&s_param_color_tag_alt);
-  wm.addParameter(&s_param_show_tag_alt);
-  wm.addParameter(&s_param_color_reset_controls);
   wm.setSaveParamsCallback(onPortalParamsSaved);
 }
 

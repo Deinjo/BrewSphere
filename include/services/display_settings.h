@@ -73,8 +73,11 @@ void saveFromPortal(const char* footer_checkbox, const char* weather_checkbox,
                      const char* text_scale_percent_value,
                      const char* ota_password_value,
                      const char* night_enabled_checkbox,
-                     const char* night_start_value,
-                     const char* night_end_value);
+                    const char* night_start_value,
+                    const char* night_end_value);
+
+/** Update only the OTA password from the compact WiFiManager settings page. */
+void saveOtaPasswordFromPortal(const char* ota_password_value);
 
 /** Store HTML color input values as persistent 0xRRGGBB colors. */
 void saveColorsFromPortal(const char* background, const char* grid,
