@@ -600,7 +600,7 @@ class BrewfatherGui(tk.Tk):
             x_label="Minuten", special_99=False, staircase=True, y_min=50.0,
             temperature_bands=(
                 (60.0, 65.0, "#fff8d8", "#9a7600", "Beta-Amylase"),
-                (70.0, 75.0, "#eaf4ff", "#9a7600", "Alpha-Amylase"),
+                (70.0, 75.0, "#eaf4ff", "#24527a", "Alpha-Amylase"),
             ),
         )
 
