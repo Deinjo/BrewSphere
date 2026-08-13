@@ -98,34 +98,6 @@ Eingabe kontrolliert werden.
 Die Oberflaeche ist in einen Eingabebereich, eine Batch-Tabelle, einen
 Request-Bereich, einen JSON-Bereich und einen Ergebnisbereich aufgeteilt.
 
-Schematische Darstellung:
-
-```text
-+--------------------------------------------------------------------------+
-| Brewfather-Zugang und Abfrage                                           |
-| User-ID:       [................................] [Speichern]           |
-| API-Key:       [****************................] [Speichern] [anzeigen] |
-| Batch-Status:  [Fermenting v]                                           |
-| Batch-ID:      [................................]                        |
-| Basis-URL:     [https://api.brewfather.app/v2]                           |
-| Timeout:       [10]                                                       |
-|                                                                          |
-| [Get Batch] [Last Reading] [All Readings] [Brew Tracker] [Alle Batches]  |
-|                         [Eingaben loeschen]                              |
-+----------------------------------+---------------------------------------+
-| Batches                          | API Requests                         |
-| Recipe Name | Name | ID | Status | GET https://.../batches?...          |
-| ...                              +---------------------------------------+
-| ...                              | JSON Response                        |
-| ...                              | {                                     |
-|                                  |   "_id": "...",                     |
-|                                  |   "status": "Fermenting"            |
-|                                  | }                                     |
-+----------------------------------+---------------------------------------+
-| Ergebnis: Abfrage abgeschlossen                                          |
-+--------------------------------------------------------------------------+
-```
-
 Das BrewSphere-Emblem wird im Eingabebereich und als Fenster-/Taskleistenicon
 angezeigt.
 
