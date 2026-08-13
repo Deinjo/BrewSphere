@@ -1,5 +1,8 @@
 # Brewfather API testen
 
+Eine anwenderorientierte Bedienungsanleitung mit GUI-Uebersicht befindet sich
+in [`HowTo.md`](HowTo.md).
+
 `test_brewfather_api.py` prueft den Zugriff auf die Brewfather API, waehlt
 einen Batch aus und liest dessen letzten Messwert. Das Skript gibt mindestens
 Batch und Temperatur aus. Falls vorhanden, werden auch Status, Specific Gravity
