@@ -144,6 +144,7 @@ def wordmark_startup_svg() -> str:
     return f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
   <title id="title">BrewSphere two-line startup wordmark</title>
   <rect width="512" height="512" fill="{COLORS['deep']}"/>
+  <circle cx="256" cy="256" r="246" fill="{COLORS['navy']}"/>
   <circle cx="256" cy="256" r="246" fill="none" stroke="{COLORS['cream']}" stroke-width="6"/>
   <text x="256" y="233" text-anchor="middle" fill="{COLORS['cream']}"
         font-family="Noto Sans,Arial,sans-serif" font-size="96" font-weight="700">Brew</text>
@@ -231,6 +232,10 @@ def create_wordmark_startup(output: Path, bold: Path) -> None:
     image = Image.new("RGB", (size, size), COLORS["deep"])
     draw = ImageDraw.Draw(image)
     margin = 5 * scale
+    draw.ellipse(
+        (margin, margin, size - margin - 1, size - margin - 1),
+        fill=COLORS["navy"],
+    )
     draw.ellipse(
         (margin, margin, size - margin - 1, size - margin - 1),
         outline=COLORS["cream"], width=3 * scale,
