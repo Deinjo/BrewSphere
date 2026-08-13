@@ -308,10 +308,10 @@ def create_horizontal_png(
 def create_overview(
     emblem_png: Path, compact_png: Path, monochrome_png: Path,
     horizontal_png: Path, startup_emblem_png: Path,
-    startup_wordmark_png: Path, banner_png: Path,
+    startup_wordmark_png: Path, banner_png: Path, display_png: Path,
     output: Path, regular: Path, bold: Path
 ) -> None:
-    image = Image.new("RGB", (1200, 1740), "#E9EFF3")
+    image = Image.new("RGB", (1200, 2080), "#E9EFF3")
     draw = ImageDraw.Draw(image)
     title_font = ImageFont.truetype(str(bold), 42)
     label_font = ImageFont.truetype(str(regular), 21)
@@ -369,6 +369,15 @@ def create_overview(
         (900, 270), Image.Resampling.LANCZOS
     )
     image.paste(banner, (150, 1410))
+
+    draw.rounded_rectangle((40, 1715, 1160, 2045), radius=18, fill="white",
+                           outline="#CBD7DF", width=2)
+    display = Image.open(display_png).convert("RGB").resize(
+        (260, 260), Image.Resampling.NEAREST
+    )
+    image.paste(display, (470, 1730))
+    draw.text((66, 1740), "Display preview - radial background", font=label_font,
+              fill=COLORS["navy"])
     image.save(output)
 
 
@@ -427,10 +436,13 @@ def main() -> None:
     )
     banner_png = BRAND_DIR / "brewsphere-readme-banner-1200x360.png"
     create_banner(emblem_png, banner_png, regular, bold)
+    display_png = BRAND_DIR / "brewsphere-display-preview.png"
+    if not display_png.is_file():
+        raise RuntimeError(f"required display preview not found: {display_png}")
     create_overview(
         emblem_png, BRAND_DIR / "brewsphere-mark-compact-128.png",
         monochrome_png, horizontal_png, startup_emblem_png,
-        startup_wordmark_png, banner_png,
+        startup_wordmark_png, banner_png, display_png,
         BRAND_DIR / "brewsphere-brand-overview.png", regular, bold,
     )
     print(f"Generated brand assets in {BRAND_DIR}")

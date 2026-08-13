@@ -17,6 +17,7 @@ connects the mark to the GC9A01 gauge interface.
 | `brewsphere-startup-240.png` | RGB565 hardware startup emblem |
 | `brewsphere-startup-wordmark-240.png` | RGB565 two-line startup wordmark |
 | `brewsphere-readme-banner-1200x360.png` | GitHub README banner |
+| `brewsphere-display-preview.png` | Display preview with optional radial background |
 | `brewsphere-brand-overview.png` | Visual overview of the logo system |
 
 ## Colors

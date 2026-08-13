@@ -23,7 +23,7 @@ constexpr uint16_t displayColor(uint8_t red, uint8_t green, uint8_t blue) {
 
 constexpr uint16_t kBackground = displayColor(0x0B, 0x35, 0x52);  // #0b3552
 constexpr uint16_t kPanel = displayColor(0x17, 0x3F, 0x5D);       // #173f5d
-constexpr uint16_t kBlue = displayColor(0x3D, 0x83, 0xDF);        // #3d83df
+constexpr uint16_t kBlue = displayColor(0xFF, 0x9D, 0x00);        // #ff9d00
 constexpr uint16_t kCyan = displayColor(0x41, 0xDE, 0xDE);        // #41dede
 constexpr uint16_t kCream = displayColor(0xFF, 0xE3, 0x9B);      // #ffe39b
 constexpr uint16_t kPlato = displayColor(0xFF, 0xF1, 0xC9);      // #fff1c9
@@ -34,7 +34,7 @@ constexpr uint16_t kBatchValue = displayColor(0xF0, 0xF4, 0xF6); // #f0f4f6
 constexpr uint16_t kRecipe = displayColor(0xD5, 0xE0, 0xE7);     // #d5e0e7
 
 static_assert(kBackground == 0x09AA);
-static_assert(kBlue == 0x3C1B);
+static_assert(kBlue == 0xFCE0);
 static_assert(kCyan == 0x46FB);
 static_assert(kCream == 0xFF13);
 

@@ -36,12 +36,29 @@ def build_static_svg(source: Path, output: Path) -> None:
     tree.write(output, encoding="utf-8", xml_declaration=True)
 
 
-def render_static_background(svg: Path, inkscape: Path) -> Image.Image:
+def render_static_background(
+    svg: Path, inkscape: Path, radial_background: bool = False
+) -> Image.Image:
     with tempfile.TemporaryDirectory() as temp_dir:
         temp = Path(temp_dir)
         stripped_svg = temp / "static.svg"
         png = temp / "static.png"
         build_static_svg(svg, stripped_svg)
+        if radial_background:
+            source = stripped_svg.read_text(encoding="utf-8")
+            gradient = (
+                '<radialGradient id="brewBackgroundGradient" cx="50%" cy="50%" r="50%">'
+                '<stop offset="0%" stop-color="#104362"/>'
+                '<stop offset="100%" stop-color="#07283F"/>'
+                '</radialGradient>'
+            )
+            source = source.replace("</defs>", gradient + "</defs>", 1)
+            source = source.replace(
+                'r="120" fill="#0b3552"',
+                'r="120" fill="url(#brewBackgroundGradient)"',
+                1,
+            )
+            stripped_svg.write_text(source, encoding="utf-8")
         subprocess.run(
             [
                 str(inkscape),
@@ -251,7 +268,9 @@ def main() -> None:
         if not required.is_file():
             parser.error(f"required file not found: {required}")
 
-    background = encode_background(render_static_background(args.svg, args.inkscape))
+    background = encode_background(
+        render_static_background(args.svg, args.inkscape, radial_background=True)
+    )
     latin = list(range(0x20, 0x100))
     font_specs = [
         ("NotoRegular6", regular, 6, sorted(set(map(ord, "ZIEL 0123456789.-P°")))),
