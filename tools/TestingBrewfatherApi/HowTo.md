@@ -10,7 +10,7 @@ gesendet wurden.
 Die GUI-Version wird im Fenstertitel angezeigt. Aktuell ist dies:
 
 ```text
-Brewfather API Test v1.13.0
+Brewfather API Test v1.19.0
 ```
 
 ## Starten
@@ -127,15 +127,28 @@ Unter dem Diagramm werden die erkannten Steps in einer Tabelle angezeigt:
 | `displayPressure` | Angezeigter Druck |
 | `Type` | Brewfather-Schritttyp |
 
+Der Unterreiter **Maischen** verwendet den Abschnitt `recipe.mash.steps` und ist
+analog aufgebaut. Die X-Achse zeigt dort Minuten, da `stepTime` bei
+Maischschritten in Minuten angegeben wird. Das Maischprofil wird als
+Stufendiagramm gezeichnet: Die Temperatur wird für die gesamte `StepTime` des
+aktuellen Schritts gehalten und wechselt erst am Ende dieser Phase auf die
+Temperatur des nächsten Schritts. Die Maisch-Step-Tabelle enthält nur
+`StepTime`, `StepTimeKumiliert`, `StepTemp` und `Name`.
+
+Die Y-Achse des Maischdiagramms beginnt bei 50 °C. Zusätzlich sind zwei
+Temperaturbereiche im Diagrammhintergrund markiert: 60–65 °C für
+`Beta-Amylase` in blassem Gelb und 70–75 °C für `Alpha-Amylase` in blassem
+Blau.
+
 ## GUI-Uebersicht
 
 Die Oberflaeche ist in einen Eingabebereich, eine Batch-Tabelle, einen
 Ergebnisbereich sowie einen rechten Reiterbereich aufgeteilt.
 
-Der rechte Bereich besitzt aktuell zwei Reiter:
+Der rechte Bereich besitzt aktuell zwei Hauptreiter:
 
 - **API-Request/-Response** mit gesendeten Requests und JSON-Antwort
-- **Diagramm** mit Fermentationskurve und Step-Tabelle
+- **Diagramm** mit den Unterreitern **Fermentation** und **Maischen**
 
 Weitere Funktionsbereiche koennen spaeter als zusaetzliche Reiter ergaenzt
 werden.

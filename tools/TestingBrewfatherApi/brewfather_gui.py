@@ -16,7 +16,7 @@ from PIL import Image, ImageTk
 
 import test_brewfather_api as api
 
-TOOL_VERSION = "1.13.0"
+TOOL_VERSION = "1.19.0"
 BRAND_IMAGE_NAME = "brewsphere-emblem-512.png"
 
 STATUS_COLORS = {
@@ -233,14 +233,25 @@ class BrewfatherGui(tk.Tk):
         right_panel.grid(row=1, column=1, rowspan=2, padx=(0, 12), pady=(0, 12), sticky="nsew")
         api_tab = ttk.Frame(right_panel)
         chart_tab = ttk.Frame(right_panel)
+        mash_tab = ttk.Frame(right_panel)
         right_panel.add(api_tab, text="API-Request/-Response")
         right_panel.add(chart_tab, text="Diagramm")
         api_tab.columnconfigure(0, weight=1)
         api_tab.rowconfigure(1, weight=1)
         chart_tab.columnconfigure(0, weight=1)
         chart_tab.rowconfigure(0, weight=1)
+        profile_tabs = ttk.Notebook(chart_tab)
+        profile_tabs.grid(row=0, column=0, sticky="nsew")
+        fermentation_tab = ttk.Frame(profile_tabs)
+        mash_tab = ttk.Frame(profile_tabs)
+        profile_tabs.add(fermentation_tab, text="Fermentation")
+        profile_tabs.add(mash_tab, text="Maischen")
+        fermentation_tab.columnconfigure(0, weight=1)
+        fermentation_tab.rowconfigure(0, weight=1)
+        mash_tab.columnconfigure(0, weight=1)
+        mash_tab.rowconfigure(0, weight=1)
 
-        chart_frame = ttk.LabelFrame(chart_tab, text="Fermentationsprofil")
+        chart_frame = ttk.LabelFrame(fermentation_tab, text="Fermentationsprofil")
         chart_frame.grid(row=0, column=0, sticky="nsew")
         chart_frame.columnconfigure(0, weight=1)
         chart_frame.rowconfigure(0, weight=1)
@@ -272,6 +283,36 @@ class BrewfatherGui(tk.Tk):
         step_scrollbar = ttk.Scrollbar(chart_frame, command=self.step_table.yview)
         step_scrollbar.grid(row=1, column=1, sticky="ns", pady=(8, 0))
         self.step_table.configure(yscrollcommand=step_scrollbar.set)
+
+        mash_frame = ttk.LabelFrame(mash_tab, text="Maischprofil")
+        mash_frame.grid(row=0, column=0, sticky="nsew")
+        mash_frame.columnconfigure(0, weight=1)
+        mash_frame.rowconfigure(0, weight=1)
+        self.mash_canvas = tk.Canvas(
+            mash_frame, background="#ffffff", highlightthickness=1,
+            highlightbackground="#b7c1cc", height=260,
+        )
+        self.mash_canvas.grid(row=0, column=0, sticky="nsew")
+        self.mash_steps = []
+        self.mash_canvas.bind("<Configure>", lambda _event: self._draw_mash_chart())
+        self.mash_table = ttk.Treeview(
+            mash_frame,
+            columns=("time", "cumulative", "temperature", "name"),
+            show="headings", height=8,
+        )
+        mash_columns = (
+            ("time", "StepTime", 80),
+            ("cumulative", "StepTimeKumiliert", 130),
+            ("temperature", "StepTemp", 80),
+            ("name", "Name", 420),
+        )
+        for column, heading, width in mash_columns:
+            self.mash_table.heading(column, text=heading)
+            self.mash_table.column(column, width=width, anchor="w")
+        self.mash_table.grid(row=1, column=0, sticky="ew", pady=(8, 0))
+        mash_scrollbar = ttk.Scrollbar(mash_frame, command=self.mash_table.yview)
+        mash_scrollbar.grid(row=1, column=1, sticky="ns", pady=(8, 0))
+        self.mash_table.configure(yscrollcommand=mash_scrollbar.set)
 
         result_frame = ttk.LabelFrame(self, text="Ergebnis")
         result_frame.grid(row=2, column=0, padx=12, pady=(0, 12), sticky="ew")
@@ -356,6 +397,11 @@ class BrewfatherGui(tk.Tk):
         self._write_json("")
         for item in self.batch_table.get_children():
             self.batch_table.delete(item)
+        for table in (self.step_table, self.mash_table):
+            for item in table.get_children():
+                table.delete(item)
+        self.chart_steps = []
+        self.mash_steps = []
         self.progress.configure(text="Bereit")
 
     def _copy_batch_id(self, event):
@@ -403,8 +449,12 @@ class BrewfatherGui(tk.Tk):
             self._highlight_json(text)
         self.json_output.configure(state="disabled")
 
-    def _draw_chart(self):
-        canvas = self.chart_canvas
+    def _draw_chart(
+        self, canvas=None, steps=None, x_label="Tage", special_99=True,
+        staircase=False, y_min=0.0, temperature_bands=None,
+    ):
+        canvas = self.chart_canvas if canvas is None else canvas
+        steps = self.chart_steps if steps is None else steps
         canvas.delete("all")
         width = canvas.winfo_width()
         height = canvas.winfo_height()
@@ -414,26 +464,40 @@ class BrewfatherGui(tk.Tk):
         left, right, top, bottom = 58, 18, 18, 42
         plot_width = width - left - right
         plot_height = height - top - bottom
-        max_temperature = max((step["temperature"] for step in self.chart_steps), default=0.0)
-        y_max = max(2.0, math.ceil((max_temperature + 3.0) / 2.0) * 2.0)
+        max_temperature = max((step["temperature"] for step in steps), default=y_min)
+        y_max = max(y_min + 2.0, math.ceil((max_temperature + 3.0) / 2.0) * 2.0)
         x_max = max(
             1.0,
-            math.ceil(max((step["cumulative"] for step in self.chart_steps), default=1.0)),
+            math.ceil(max((step["cumulative"] for step in steps), default=1.0)),
         )
-        special_last_step = bool(
-            self.chart_steps and math.isclose(self.chart_steps[-1]["duration"], 99.0)
+        special_last_step = bool(special_99 and
+            steps and math.isclose(steps[-1]["duration"], 99.0)
         )
         if special_last_step:
-            last_step = self.chart_steps[-1]
+            last_step = steps[-1]
             x_max = last_step["cumulative"] - last_step["duration"] + 6.0
 
         def x_position(day):
             return left + (day / x_max) * plot_width
 
         def y_position(temperature):
-            return top + ((y_max - temperature) / y_max) * plot_height
+            return top + ((y_max - temperature) / (y_max - y_min)) * plot_height
 
-        for temperature in range(0, int(y_max) + 1, 2):
+        for band in temperature_bands or ():
+            lower, upper, background, label_color, label = band
+            canvas.create_rectangle(
+                left, y_position(upper), width - right, y_position(lower),
+                fill=background, outline="",
+            )
+            canvas.create_text(
+                left + plot_width / 2,
+                (y_position(lower) + y_position(upper)) / 2,
+                text=label,
+                fill=label_color,
+                font=("Segoe UI", 10, "bold"),
+            )
+
+        for temperature in range(int(y_min), int(y_max) + 1, 2):
             y = y_position(temperature)
             canvas.create_line(left, y, width - right, y, fill="#d8dee6")
             canvas.create_text(
@@ -458,7 +522,7 @@ class BrewfatherGui(tk.Tk):
             )
 
         canvas.create_text(
-            width / 2, height - 8, text="Tage", anchor="s",
+            width / 2, height - 8, text=x_label, anchor="s",
             fill="#1f2937", font=("Segoe UI", 10, "bold"),
         )
         canvas.create_text(
@@ -466,11 +530,11 @@ class BrewfatherGui(tk.Tk):
             fill="#1f2937", font=("Segoe UI", 10, "bold"),
         )
 
-        if len(self.chart_steps) >= 2:
+        if len(steps) >= 2 or (staircase and steps):
             if special_last_step:
-                last_step = self.chart_steps[-1]
+                last_step = steps[-1]
                 split_day = last_step["cumulative"] - last_step["duration"] + 5.0
-                line_steps = self.chart_steps[:-1]
+                line_steps = steps[:-1]
                 points = [
                     coordinate
                     for step in line_steps
@@ -484,24 +548,61 @@ class BrewfatherGui(tk.Tk):
                     fill="#d62828", width=3, dash=(7, 4),
                 )
             else:
-                points = [
-                    coordinate
-                    for step in self.chart_steps
-                    for coordinate in (x_position(step["cumulative"]), y_position(step["temperature"]))
-                ]
+                if staircase:
+                    points = []
+                    phase_boundaries = []
+                    previous_temperature = None
+                    for step in steps:
+                        phase_end = step["cumulative"]
+                        phase_start = phase_end - step["duration"]
+                        temperature = step["temperature"]
+                        if previous_temperature is None:
+                            points.extend((x_position(phase_start), y_position(temperature)))
+                        else:
+                            points.extend((x_position(phase_start), y_position(previous_temperature)))
+                            points.extend((x_position(phase_start), y_position(temperature)))
+                        points.extend((x_position(phase_end), y_position(temperature)))
+                        phase_boundaries.append((phase_start, phase_end, temperature, step["name"]))
+                        previous_temperature = temperature
+                else:
+                    points = [
+                        coordinate
+                        for step in steps
+                        for coordinate in (x_position(step["cumulative"]), y_position(step["temperature"]))
+                    ]
                 canvas.create_line(*points, fill="#d62828", width=3)
-            marker_steps = self.chart_steps[:-1] if special_last_step else self.chart_steps
+                if staircase:
+                    for phase_start, phase_end, temperature, name in phase_boundaries:
+                        if name and phase_end > phase_start:
+                            canvas.create_text(
+                                x_position((phase_start + phase_end) / 2),
+                                y_position(temperature) - 10,
+                                text=name,
+                                fill="#7f1d1d",
+                                font=("Segoe UI", 8),
+                            )
+            marker_steps = steps[:-1] if special_last_step else steps
             for step in marker_steps:
                 x, y = x_position(step["cumulative"]), y_position(step["temperature"])
                 canvas.create_oval(x - 4, y - 4, x + 4, y + 4, fill="#d62828", outline="#ffffff")
             if special_last_step:
-                last_step = self.chart_steps[-1]
+                last_step = steps[-1]
                 x, y = x_position(x_max), y_position(last_step["temperature"])
                 canvas.create_oval(x - 4, y - 4, x + 4, y + 4, fill="#d62828", outline="#ffffff")
-        elif self.chart_steps:
-            step = self.chart_steps[0]
+        elif steps:
+            step = steps[0]
             x, y = x_position(step["cumulative"]), y_position(step["temperature"])
             canvas.create_oval(x - 4, y - 4, x + 4, y + 4, fill="#d62828", outline="")
+
+    def _draw_mash_chart(self):
+        self._draw_chart(
+            self.mash_canvas, self.mash_steps,
+            x_label="Minuten", special_99=False, staircase=True, y_min=50.0,
+            temperature_bands=(
+                (60.0, 65.0, "#fff8d8", "#9a7600", "Beta-Amylase"),
+                (70.0, 75.0, "#eaf4ff", "#9a7600", "Alpha-Amylase"),
+            ),
+        )
 
     def _highlight_json(self, text):
         token_pattern = re.compile(
@@ -618,13 +719,14 @@ class BrewfatherGui(tk.Tk):
                 request_callback=self._request_callback,
             )
             chart_steps = self._fermentation_steps(response) if values["endpoint"] == "batch" else None
+            mash_steps = self._mash_steps(response) if values["endpoint"] == "batch" else None
             result_text = f"{labels[values['endpoint']]} erfolgreich abgefragt."
             if values["endpoint"] == "batch":
                 result_text += f" Fermentationsschritte erkannt: {len(chart_steps)}."
             self.after(
                 0, self._finish,
                 result_text,
-                False, json.dumps(response, indent=2, ensure_ascii=False), chart_steps,
+                False, json.dumps(response, indent=2, ensure_ascii=False), chart_steps, mash_steps,
             )
         except Exception as error:
             self.after(0, self._finish, f"Fehler: {error}", True)
@@ -781,24 +883,37 @@ class BrewfatherGui(tk.Tk):
             recipe = response.get("recipe")
             fermentation = recipe.get("fermentation") if isinstance(recipe, dict) else None
         steps = fermentation.get("steps") if isinstance(fermentation, dict) else None
+        return BrewfatherGui._profile_steps(steps)
+
+    @staticmethod
+    def _mash_steps(response):
+        if not isinstance(response, dict):
+            return []
+        recipe = response.get("recipe")
+        mash = recipe.get("mash") if isinstance(recipe, dict) else None
+        steps = mash.get("steps") if isinstance(mash, dict) else None
+        return BrewfatherGui._profile_steps(steps)
+
+    @staticmethod
+    def _profile_steps(steps):
         if not isinstance(steps, list):
             return []
         values = []
-        elapsed_days = 0.0
+        elapsed_time = 0.0
         for step in steps:
             if not isinstance(step, dict):
                 continue
             try:
-                day = float(step["stepTime"])
+                duration = float(step["stepTime"])
                 temperature = float(step.get("stepTemp", step.get("displayStepTemp")))
             except (KeyError, TypeError, ValueError):
                 continue
-            if math.isfinite(day) and math.isfinite(temperature):
-                elapsed_days += max(0.0, day)
+            if math.isfinite(duration) and math.isfinite(temperature):
+                elapsed_time += max(0.0, duration)
                 values.append(
                     {
-                        "duration": max(0.0, day),
-                        "cumulative": elapsed_days,
+                        "duration": max(0.0, duration),
+                        "cumulative": elapsed_time,
                         "temperature": max(0.0, temperature),
                         "actual_time": step.get("actualTime"),
                         "name": str(step.get("name", "")),
@@ -840,7 +955,7 @@ class BrewfatherGui(tk.Tk):
             berlin_time = utc_time + timedelta(hours=offset)
         return berlin_time.strftime("%d.%m.%Y %H:%M:%S")
 
-    def _finish(self, text, failed=False, json_text=None, chart_steps=None):
+    def _finish(self, text, failed=False, json_text=None, chart_steps=None, mash_steps=None):
         self._write_output(text)
         if json_text is not None:
             self._write_json(json_text)
@@ -862,6 +977,21 @@ class BrewfatherGui(tk.Tk):
                     ),
                 )
             self._draw_chart_when_ready()
+        if mash_steps is not None:
+            self.mash_steps = mash_steps
+            for item in self.mash_table.get_children():
+                self.mash_table.delete(item)
+            for step in mash_steps:
+                self.mash_table.insert(
+                    "", "end",
+                    values=(
+                        self._format_number(step["duration"]),
+                        self._format_number(step["cumulative"]),
+                        self._format_number(step["temperature"]),
+                        step["name"],
+                    ),
+                )
+            self.after_idle(self._draw_mash_chart)
         self.progress.configure(text="Fehler" if failed else "Abfrage abgeschlossen")
         for button in self.action_buttons:
             button.configure(state="normal")

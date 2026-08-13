@@ -8,7 +8,7 @@ einen Batch aus und liest dessen letzten Messwert. Das Skript gibt mindestens
 Batch und Temperatur aus. Falls vorhanden, werden auch Status, Specific Gravity
 (SG) und Sensortyp angezeigt.
 
-Die grafische Anwendung ist aktuell Version **1.13.0**. Die Versionsnummer wird
+Die grafische Anwendung ist aktuell Version **1.19.0**. Die Versionsnummer wird
 im Fenstertitel angezeigt und bei funktionalen Erweiterungen erhoeht. Sie wird
 nicht in Datei- oder EXE-Namen verwendet, damit stabile Pfade fuer GitHub und
 die Benutzer erhalten bleiben.
