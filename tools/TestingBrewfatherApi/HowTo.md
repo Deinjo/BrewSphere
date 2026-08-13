@@ -10,7 +10,7 @@ gesendet wurden.
 Die GUI-Version wird im Fenstertitel angezeigt. Aktuell ist dies:
 
 ```text
-Brewfather API Test v1.4.0
+Brewfather API Test v1.13.0
 ```
 
 ## Starten
@@ -93,10 +93,52 @@ in `config_local.h` geschrieben.
 Der API-Key wird standardmaessig verdeckt. Mit **API-Key anzeigen** kann die
 Eingabe kontrolliert werden.
 
+## Fermentationsprofil
+
+Nach einer erfolgreichen **Get Batch**-Abfrage wird aus dem Abschnitt
+`fermentation.steps` ein Temperaturprofil gezeichnet.
+
+- X-Achse: `stepTime` in Tagen
+- Y-Achse: `stepTemp` in °C
+- Temperaturbereich: `0..30 °C`
+- horizontale Gitternetzlinien: alle `2 °C`
+- Kurvenfarbe: Rot
+- direkte Verbindung der Punkte ohne Interpolation
+- jeder Datenpunkt wird mit einem roten Marker gekennzeichnet
+- Y-Achse ab `0 °C`, Maximum dynamisch drei Grad ueber dem hoechsten Datenpunkt
+  und auf das naechste gerade Vielfache von `2 °C` aufgerundet
+- ein letzter Schritt mit `stepTime=99` wird auf 5 Tage durchgezogen und einen
+  weiteren Tag gestrichelt dargestellt
+
+Die einzelnen Steps werden in der Reihenfolge der API-Antwort verbunden. Das
+Diagramm passt sich automatisch an die Fensterbreite an. Fehlende oder
+ungueltige Step-Werte werden ignoriert. Wenn keine Fermentationsdaten vorhanden
+sind, bleibt der Diagrammbereich leer.
+
+Unter dem Diagramm werden die erkannten Steps in einer Tabelle angezeigt:
+
+| Spalte | Inhalt |
+|---|---|
+| `ActualTime (Berlin)` | `actualTime` als deutsche Ortszeit fuer Berlin |
+| `StepTime` | Dauer des einzelnen Schritts in Tagen |
+| `StepTimeKumiliert` | Kumulierte Zeit seit Beginn |
+| `StepTemp` | Temperatur des Schritts in °C |
+| `Name` | Name des Fermentationsschritts |
+| `displayPressure` | Angezeigter Druck |
+| `Type` | Brewfather-Schritttyp |
+
 ## GUI-Uebersicht
 
 Die Oberflaeche ist in einen Eingabebereich, eine Batch-Tabelle, einen
-Request-Bereich, einen JSON-Bereich und einen Ergebnisbereich aufgeteilt.
+Ergebnisbereich sowie einen rechten Reiterbereich aufgeteilt.
+
+Der rechte Bereich besitzt aktuell zwei Reiter:
+
+- **API-Request/-Response** mit gesendeten Requests und JSON-Antwort
+- **Diagramm** mit Fermentationskurve und Step-Tabelle
+
+Weitere Funktionsbereiche koennen spaeter als zusaetzliche Reiter ergaenzt
+werden.
 
 Das BrewSphere-Emblem wird im Eingabebereich und als Fenster-/Taskleistenicon
 angezeigt.

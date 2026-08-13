@@ -2,18 +2,21 @@
 """Simple graphical front end for test_brewfather_api.py."""
 
 import json
+import math
 import sys
 import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import re
 from urllib.error import HTTPError
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from PIL import Image, ImageTk
 
 import test_brewfather_api as api
 
-TOOL_VERSION = "1.4.0"
+TOOL_VERSION = "1.13.0"
 BRAND_IMAGE_NAME = "brewsphere-emblem-512.png"
 
 STATUS_COLORS = {
@@ -226,6 +229,50 @@ class BrewfatherGui(tk.Tk):
         table_scrollbar.grid(row=0, column=1, sticky="ns")
         self.batch_table.configure(yscrollcommand=table_scrollbar.set)
 
+        right_panel = ttk.Notebook(self)
+        right_panel.grid(row=1, column=1, rowspan=2, padx=(0, 12), pady=(0, 12), sticky="nsew")
+        api_tab = ttk.Frame(right_panel)
+        chart_tab = ttk.Frame(right_panel)
+        right_panel.add(api_tab, text="API-Request/-Response")
+        right_panel.add(chart_tab, text="Diagramm")
+        api_tab.columnconfigure(0, weight=1)
+        api_tab.rowconfigure(1, weight=1)
+        chart_tab.columnconfigure(0, weight=1)
+        chart_tab.rowconfigure(0, weight=1)
+
+        chart_frame = ttk.LabelFrame(chart_tab, text="Fermentationsprofil")
+        chart_frame.grid(row=0, column=0, sticky="nsew")
+        chart_frame.columnconfigure(0, weight=1)
+        chart_frame.rowconfigure(0, weight=1)
+        self.chart_canvas = tk.Canvas(
+            chart_frame, background="#ffffff", highlightthickness=1,
+            highlightbackground="#b7c1cc", height=260,
+        )
+        self.chart_canvas.grid(row=0, column=0, sticky="nsew")
+        self.chart_steps = []
+        self.chart_canvas.bind("<Configure>", lambda _event: self._draw_chart())
+        self.step_table = ttk.Treeview(
+            chart_frame,
+            columns=("actual", "time", "cumulative", "temperature", "name", "pressure", "type"),
+            show="headings", height=8,
+        )
+        step_columns = (
+            ("actual", "ActualTime (Berlin)", 150),
+            ("time", "StepTime", 80),
+            ("cumulative", "StepTimeKumiliert", 130),
+            ("temperature", "StepTemp", 80),
+            ("name", "Name", 420),
+            ("pressure", "displayPressure", 120),
+            ("type", "Type", 120),
+        )
+        for column, heading, width in step_columns:
+            self.step_table.heading(column, text=heading)
+            self.step_table.column(column, width=width, anchor="w")
+        self.step_table.grid(row=1, column=0, sticky="ew", pady=(8, 0))
+        step_scrollbar = ttk.Scrollbar(chart_frame, command=self.step_table.yview)
+        step_scrollbar.grid(row=1, column=1, sticky="ns", pady=(8, 0))
+        self.step_table.configure(yscrollcommand=step_scrollbar.set)
+
         result_frame = ttk.LabelFrame(self, text="Ergebnis")
         result_frame.grid(row=2, column=0, padx=12, pady=(0, 12), sticky="ew")
         result_frame.columnconfigure(0, weight=1)
@@ -238,12 +285,7 @@ class BrewfatherGui(tk.Tk):
         self.progress = ttk.Label(result_frame, text="Bereit", anchor="w")
         self.progress.grid(row=1, column=0, columnspan=2, padx=8, pady=(6, 8), sticky="ew")
 
-        right_panel = ttk.Frame(self)
-        right_panel.grid(row=1, column=1, rowspan=2, padx=(0, 12), pady=(0, 12), sticky="nsew")
-        right_panel.columnconfigure(0, weight=1)
-        right_panel.rowconfigure(1, weight=1)
-
-        request_frame = ttk.LabelFrame(right_panel, text="API Requests")
+        request_frame = ttk.LabelFrame(api_tab, text="API Requests")
         request_frame.grid(row=0, column=0, sticky="ew", pady=(0, 8))
         request_frame.columnconfigure(0, weight=1)
         request_frame.rowconfigure(0, weight=1)
@@ -259,7 +301,7 @@ class BrewfatherGui(tk.Tk):
         self.request_output.tag_configure("method", foreground="#4ec9b0")
         self.request_output.tag_configure("url", foreground="#9cdcfe")
 
-        json_frame = ttk.LabelFrame(right_panel, text="JSON Response")
+        json_frame = ttk.LabelFrame(api_tab, text="JSON Response")
         json_frame.grid(row=1, column=0, sticky="nsew")
         json_frame.columnconfigure(0, weight=1)
         json_frame.rowconfigure(0, weight=1)
@@ -360,6 +402,106 @@ class BrewfatherGui(tk.Tk):
         if text:
             self._highlight_json(text)
         self.json_output.configure(state="disabled")
+
+    def _draw_chart(self):
+        canvas = self.chart_canvas
+        canvas.delete("all")
+        width = canvas.winfo_width()
+        height = canvas.winfo_height()
+        if width < 120 or height < 100:
+            return
+
+        left, right, top, bottom = 58, 18, 18, 42
+        plot_width = width - left - right
+        plot_height = height - top - bottom
+        max_temperature = max((step["temperature"] for step in self.chart_steps), default=0.0)
+        y_max = max(2.0, math.ceil((max_temperature + 3.0) / 2.0) * 2.0)
+        x_max = max(
+            1.0,
+            math.ceil(max((step["cumulative"] for step in self.chart_steps), default=1.0)),
+        )
+        special_last_step = bool(
+            self.chart_steps and math.isclose(self.chart_steps[-1]["duration"], 99.0)
+        )
+        if special_last_step:
+            last_step = self.chart_steps[-1]
+            x_max = last_step["cumulative"] - last_step["duration"] + 6.0
+
+        def x_position(day):
+            return left + (day / x_max) * plot_width
+
+        def y_position(temperature):
+            return top + ((y_max - temperature) / y_max) * plot_height
+
+        for temperature in range(0, int(y_max) + 1, 2):
+            y = y_position(temperature)
+            canvas.create_line(left, y, width - right, y, fill="#d8dee6")
+            canvas.create_text(
+                left - 8, y, text=str(temperature), anchor="e",
+                fill="#334155", font=("Segoe UI", 9),
+            )
+
+        canvas.create_line(left, top, left, height - bottom, fill="#334155", width=1)
+        canvas.create_line(
+            left, height - bottom, width - right, height - bottom,
+            fill="#334155", width=1,
+        )
+        x_tick_step = max(1, math.ceil(x_max / 8))
+        for day in range(0, int(x_max) + 1, x_tick_step):
+            x = x_position(day)
+            canvas.create_line(
+                x, height - bottom, x, height - bottom + 5, fill="#334155",
+            )
+            canvas.create_text(
+                x, height - bottom + 17, text=str(day), anchor="n",
+                fill="#334155", font=("Segoe UI", 9),
+            )
+
+        canvas.create_text(
+            width / 2, height - 8, text="Tage", anchor="s",
+            fill="#1f2937", font=("Segoe UI", 10, "bold"),
+        )
+        canvas.create_text(
+            13, top + plot_height / 2, text="Temperatur [°C]", angle=90,
+            fill="#1f2937", font=("Segoe UI", 10, "bold"),
+        )
+
+        if len(self.chart_steps) >= 2:
+            if special_last_step:
+                last_step = self.chart_steps[-1]
+                split_day = last_step["cumulative"] - last_step["duration"] + 5.0
+                line_steps = self.chart_steps[:-1]
+                points = [
+                    coordinate
+                    for step in line_steps
+                    for coordinate in (x_position(step["cumulative"]), y_position(step["temperature"]))
+                ]
+                points.extend((x_position(split_day), y_position(last_step["temperature"])))
+                canvas.create_line(*points, fill="#d62828", width=3)
+                canvas.create_line(
+                    x_position(split_day), y_position(last_step["temperature"]),
+                    x_position(x_max), y_position(last_step["temperature"]),
+                    fill="#d62828", width=3, dash=(7, 4),
+                )
+            else:
+                points = [
+                    coordinate
+                    for step in self.chart_steps
+                    for coordinate in (x_position(step["cumulative"]), y_position(step["temperature"]))
+                ]
+                canvas.create_line(*points, fill="#d62828", width=3)
+            marker_steps = self.chart_steps[:-1] if special_last_step else self.chart_steps
+            for step in marker_steps:
+                x, y = x_position(step["cumulative"]), y_position(step["temperature"])
+                canvas.create_oval(x - 4, y - 4, x + 4, y + 4, fill="#d62828", outline="#ffffff")
+            if special_last_step:
+                last_step = self.chart_steps[-1]
+                x, y = x_position(x_max), y_position(last_step["temperature"])
+                canvas.create_oval(x - 4, y - 4, x + 4, y + 4, fill="#d62828", outline="#ffffff")
+        elif self.chart_steps:
+            step = self.chart_steps[0]
+            x, y = x_position(step["cumulative"]), y_position(step["temperature"])
+            canvas.create_oval(x - 4, y - 4, x + 4, y + 4, fill="#d62828", outline="")
 
     def _highlight_json(self, text):
         token_pattern = re.compile(
@@ -475,10 +617,14 @@ class BrewfatherGui(tk.Tk):
                 values["api_key"], values["timeout"],
                 request_callback=self._request_callback,
             )
+            chart_steps = self._fermentation_steps(response) if values["endpoint"] == "batch" else None
+            result_text = f"{labels[values['endpoint']]} erfolgreich abgefragt."
+            if values["endpoint"] == "batch":
+                result_text += f" Fermentationsschritte erkannt: {len(chart_steps)}."
             self.after(
                 0, self._finish,
-                f"{labels[values['endpoint']]} erfolgreich abgefragt.",
-                False, json.dumps(response, indent=2, ensure_ascii=False),
+                result_text,
+                False, json.dumps(response, indent=2, ensure_ascii=False), chart_steps,
             )
         except Exception as error:
             self.after(0, self._finish, f"Fehler: {error}", True)
@@ -603,6 +749,7 @@ class BrewfatherGui(tk.Tk):
             self.after(
                 0, self._finish, "\n".join(line for line in lines if line),
                 False, json.dumps(response, indent=2, ensure_ascii=False),
+                self._fermentation_steps(batch),
             )
         except Exception as error:
             self.after(0, self._finish, f"Fehler: {error}", True)
@@ -625,14 +772,109 @@ class BrewfatherGui(tk.Tk):
             lines.append(f"Navigierbares HTML gespeichert: {path}")
         return lines
 
-    def _finish(self, text, failed=False, json_text=None):
+    @staticmethod
+    def _fermentation_steps(response):
+        if not isinstance(response, dict):
+            return []
+        fermentation = response.get("fermentation")
+        if not isinstance(fermentation, dict):
+            recipe = response.get("recipe")
+            fermentation = recipe.get("fermentation") if isinstance(recipe, dict) else None
+        steps = fermentation.get("steps") if isinstance(fermentation, dict) else None
+        if not isinstance(steps, list):
+            return []
+        values = []
+        elapsed_days = 0.0
+        for step in steps:
+            if not isinstance(step, dict):
+                continue
+            try:
+                day = float(step["stepTime"])
+                temperature = float(step.get("stepTemp", step.get("displayStepTemp")))
+            except (KeyError, TypeError, ValueError):
+                continue
+            if math.isfinite(day) and math.isfinite(temperature):
+                elapsed_days += max(0.0, day)
+                values.append(
+                    {
+                        "duration": max(0.0, day),
+                        "cumulative": elapsed_days,
+                        "temperature": max(0.0, temperature),
+                        "actual_time": step.get("actualTime"),
+                        "name": str(step.get("name", "")),
+                        "pressure": step.get("displayPressure"),
+                        "type": str(step.get("type", "")),
+                    }
+                )
+        return values
+
+    @staticmethod
+    def _format_number(value):
+        if value is None:
+            return ""
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            return str(value)
+        return f"{number:g}"
+
+    @staticmethod
+    def _format_actual_time(value):
+        if value is None:
+            return ""
+        try:
+            utc_time = datetime.fromtimestamp(float(value) / 1000.0, tz=timezone.utc)
+        except (TypeError, ValueError, OverflowError, OSError):
+            return ""
+        try:
+            berlin_time = utc_time.astimezone(ZoneInfo("Europe/Berlin"))
+        except ZoneInfoNotFoundError:
+            year = utc_time.year
+            march_end = datetime(year, 3, 31, tzinfo=timezone.utc)
+            october_end = datetime(year, 10, 31, tzinfo=timezone.utc)
+            dst_start = march_end - timedelta(days=(march_end.weekday() + 1) % 7)
+            dst_end = october_end - timedelta(days=(october_end.weekday() + 1) % 7)
+            dst_start = dst_start.replace(hour=1)
+            dst_end = dst_end.replace(hour=1)
+            offset = 2 if dst_start <= utc_time < dst_end else 1
+            berlin_time = utc_time + timedelta(hours=offset)
+        return berlin_time.strftime("%d.%m.%Y %H:%M:%S")
+
+    def _finish(self, text, failed=False, json_text=None, chart_steps=None):
         self._write_output(text)
         if json_text is not None:
             self._write_json(json_text)
+        if chart_steps is not None:
+            self.chart_steps = chart_steps
+            for item in self.step_table.get_children():
+                self.step_table.delete(item)
+            for step in chart_steps:
+                self.step_table.insert(
+                    "", "end",
+                    values=(
+                        self._format_actual_time(step["actual_time"]),
+                        self._format_number(step["duration"]),
+                        self._format_number(step["cumulative"]),
+                        self._format_number(step["temperature"]),
+                        step["name"],
+                        self._format_number(step["pressure"]),
+                        step["type"],
+                    ),
+                )
+            self._draw_chart_when_ready()
         self.progress.configure(text="Fehler" if failed else "Abfrage abgeschlossen")
         for button in self.action_buttons:
             button.configure(state="normal")
         self.list_button.configure(state="normal")
+
+    def _draw_chart_when_ready(self, attempt=0):
+        if (
+            (self.chart_canvas.winfo_width() < 120 or self.chart_canvas.winfo_height() < 100)
+            and attempt < 20
+        ):
+            self.after(50, self._draw_chart_when_ready, attempt + 1)
+            return
+        self._draw_chart()
 
 
 if __name__ == "__main__":
