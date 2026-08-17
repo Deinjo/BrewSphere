@@ -1,3 +1,5 @@
+![BrewSphere – ESP32 Fermentation Display](docs/assets/brand/brewsphere-readme-banner-1200x360.png)
+
 # BrewSphere – Das runde Auge deines Brauprozesses
 
 BrewSphere fungiert je nach Phase als völlig unterschiedliches Instrument.
@@ -46,6 +48,69 @@ pio device monitor
 - PlatformIO env: **`supermini`**
 - Serial: **115200** baud
 - USB CDC on boot enabled in `platformio.ini` for the Super Mini
+
+### BrewSphere UI-Assets neu erzeugen
+
+Das Display verwendet einen mit Inkscape gerenderten, RLE-komprimierten
+Hintergrund und passend zur SVG-Baseline gerasterte Noto-Sans-Glyphen. Die
+generierte Datei `src/ui/brew_assets.cpp` ist eingecheckt; zum normalen
+Firmware-Build werden daher weder Inkscape noch die TTF-Dateien benötigt.
+
+Nach Änderungen an der SVG oder Typografie werden die Assets mit Python,
+Pillow, Inkscape sowie `NotoSans-Regular.ttf` und `NotoSans-Bold.ttf` neu
+erzeugt:
+
+```bash
+python scripts/build_brew_assets.py --font-dir X:/Noto_Sans/static
+```
+
+Ein anderer Font-Pfad kann auch über `BREWSPHERE_NOTO_SANS` gesetzt werden.
+
+### Marken- und Startbild-Assets neu erzeugen
+
+Das BrewSphere-Markensystem liegt unter `docs/assets/brand`. Der Generator
+erstellt das skalierbare Emblem, horizontale Wortmarke, Kompakt- und
+Monochromvariante, README-Banner sowie den RGB565-geprüften 240×240-
+Startbildschirm. Die komprimierten Firmwaredaten werden nach
+`src/ui/brand_assets.cpp` geschrieben.
+
+```bash
+python scripts/build_brand_assets.py --font-dir X:/Noto_Sans/static
+```
+
+Die Firmware zeigt nach dem Displaystart zuerst das Primary Emblem und danach
+die zweizeilige BrewSphere-Wortmarke für jeweils 1 Sekunde. Anschließend folgt
+der bestehende Verbindungs- und Anzeigepfad. Das ursprüngliche Konzeptbild bleibt unter
+`tools/BrewSphereMockup/BrewSphere_Logo.png` als Referenz unverändert erhalten.
+
+## Brewfather und simulierte Werte
+
+Im Webinterface führt **Brewfather / Simulation** zur Seite `/brew`. Dort kann
+die Datenquelle persistent zwischen **Brewfather API** und **Simulierte Werte**
+umgeschaltet werden. Im Simulationsmodus lassen sich alle Werte der
+Gärungsanzeige frei einstellen; nach dem Speichern aktualisieren sich das
+GC9A01-Display und die Webvorschau ohne Brewfather-Abfrage.
+
+Simulationsänderungen werden bereits während der Eingabe nach 300 ms live in
+den RAM übernommen. **Speichern** schreibt den aktuellen Stand zusätzlich
+dauerhaft nach NVS. Damit erzeugt die Live-Vorschau keine unnötigen
+Flash-Schreibzyklen.
+
+Alle Zahlenwerte können sowohl direkt eingegeben als auch über gekoppelte
+Schieberegler verändert werden. Im optionalen Demo-Modus bewegen sich Plato und
+Ist-Vergärgrad in einem dreiminütigen Zyklus langsam zwischen Start und Ziel;
+Soll- und Isttemperatur schwanken dabei dezent. Der Demo-Modus läuft auf dem
+Gerät auch ohne geöffnetes Browserfenster weiter.
+
+Der aktuelle Vergärgrad steuert den hellblauen Fortschrittsbogen über der
+cyanfarbenen Grundskala. Der getrennte Endvergärgrad bestimmt den Farbwechsel
+der 2,5-%-Punkteskala von Blau zu Blassgelb; jeder 10-%-Schritt einschließlich
+0 % wird als größerer Punkt dargestellt. Im Brewfather-Modus wird der
+Endvergärgrad aus gemessener OG und geschätzter FG berechnet.
+
+Die Eingaben für den aktuellen und den Zielwert erfolgen direkt in `°P`. Die
+Firmware rechnet diese intern in SG um, damit simulierte und echte Daten den
+gleichen `BrewData`- und Renderingpfad verwenden.
 
 
 

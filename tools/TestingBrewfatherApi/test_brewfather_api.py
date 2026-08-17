@@ -26,7 +26,9 @@ except ImportError:
 DEFAULT_BASE_URL = "https://api.brewfather.app/v2"
 
 
-def request_json(url: str, user_id: str, api_key: str, timeout: float):
+def request_json(url: str, user_id: str, api_key: str, timeout: float, request_callback=None):
+    if request_callback is not None:
+        request_callback("GET", url)
     credentials = f"{user_id}:{api_key}".encode("utf-8")
     authorization = base64.b64encode(credentials).decode("ascii")
     request = Request(
@@ -43,34 +45,93 @@ def request_json(url: str, user_id: str, api_key: str, timeout: float):
 
 def get_batches(
     base_url: str,
-    status: str,
+    status: str | None,
     user_id: str,
     api_key: str,
     timeout: float,
     complete: bool = False,
+    start_after: str | None = None,
+    request_callback=None,
 ):
-    query = urlencode({"status": status, "limit": 50, "complete": str(complete).lower()})
+    parameters = {"limit": 50, "complete": str(complete).lower()}
+    if status:
+        parameters["status"] = status
+    if start_after:
+        parameters["start_after"] = start_after
+    query = urlencode(parameters)
     return request_json(
-        f"{base_url.rstrip('/')}/batches?{query}", user_id, api_key, timeout
+        f"{base_url.rstrip('/')}/batches?{query}", user_id, api_key, timeout,
+        request_callback=request_callback,
     )
 
 
+def get_all_batches(
+    base_url: str,
+    user_id: str,
+    api_key: str,
+    timeout: float,
+    complete: bool = False,
+    request_callback=None,
+):
+    """Fetch all batches using Brewfather API v2 start_after paging."""
+    batches = []
+    start_after = None
+    while True:
+        page = get_batches(
+            base_url, None, user_id, api_key, timeout,
+            complete=complete, start_after=start_after,
+            request_callback=request_callback,
+        )
+        if not isinstance(page, list):
+            raise ValueError("Unerwartetes Format der Batch-Antwort (kein Array)")
+        batches.extend(page)
+        if len(page) < 50:
+            return batches
+        last_id = page[-1].get("_id") if isinstance(page[-1], dict) else None
+        if not last_id or last_id == start_after:
+            raise ValueError("Die Batch-Paginierung lieferte keine neue ID")
+        start_after = last_id
+
+
 def get_last_reading(
-    base_url: str, batch_id: str, user_id: str, api_key: str, timeout: float
+    base_url: str, batch_id: str, user_id: str, api_key: str, timeout: float,
+    request_callback=None,
 ):
     return request_json(
         f"{base_url.rstrip('/')}/batches/{batch_id}/readings/last",
         user_id,
         api_key,
-        timeout,
+        timeout, request_callback=request_callback,
     )
 
 
 def get_batch(
-    base_url: str, batch_id: str, user_id: str, api_key: str, timeout: float
+    base_url: str, batch_id: str, user_id: str, api_key: str, timeout: float,
+    request_callback=None,
 ):
     return request_json(
-        f"{base_url.rstrip('/')}/batches/{batch_id}", user_id, api_key, timeout
+        f"{base_url.rstrip('/')}/batches/{batch_id}", user_id, api_key, timeout,
+        request_callback=request_callback,
+    )
+
+
+def get_all_readings(
+    base_url: str, batch_id: str, user_id: str, api_key: str, timeout: float,
+    request_callback=None,
+):
+    return request_json(
+        f"{base_url.rstrip('/')}/batches/{batch_id}/readings",
+        user_id, api_key, timeout, request_callback=request_callback,
+    )
+
+
+def get_brew_tracker(
+    base_url: str, batch_id: str, user_id: str, api_key: str, timeout: float,
+    request_callback=None,
+):
+    return request_json(
+        f"{base_url.rstrip('/')}/batches/{batch_id}/brewtracker",
+        user_id, api_key, timeout, request_callback=request_callback,
     )
 
 

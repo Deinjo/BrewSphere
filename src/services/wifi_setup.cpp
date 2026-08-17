@@ -14,12 +14,12 @@
 #endif
 
 #include "config.h"
-#include "hardware/display.h"
+#include "services/brew_settings.h"
 #include "services/display_settings.h"
 #include "services/ota_update.h"
 #include "services/radar_location.h"
+#include "services/weather_time.h"
 #include "ui/brew_display.h"
-#include "ui/radar_range.h"
 #include "ui/status_screens.h"
 
 portMUX_TYPE s_boot_mux = portMUX_INITIALIZER_UNLOCKED;
@@ -58,6 +58,19 @@ void initBootButton() {
 
 namespace {
 
+constexpr char kEmblemSvg[] PROGMEM = R"SVG(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="BrewSphere emblem">
+<defs><clipPath id="beerClip"><path d="M219 207 C220 252 224 301 229 339 Q256 348 283 339 C288 301 292 252 293 207 Z"/></clipPath></defs>
+<circle cx="256" cy="256" r="246" fill="#0B3552"/><circle cx="256" cy="256" r="222" fill="none" stroke="#06264A" stroke-width="48"/>
+<circle cx="256" cy="256" r="222" fill="none" stroke="#FF9D00" stroke-width="48" stroke-dasharray="174.4 1220.5" transform="rotate(-45 256 256)"/>
+<g stroke="#FFF1C9" stroke-width="10" stroke-linecap="butt"><path d="M394.6 117.4 L430 82"/><path d="M452 256 L502 256"/><path d="M394.6 394.6 L430 430"/><path d="M117.4 394.6 L82 430"/><path d="M60 256 L10 256"/><path d="M117.4 117.4 L82 82"/></g>
+<circle cx="256" cy="256" r="246" fill="none" stroke="#FFF1C9" stroke-width="6"/><circle cx="256" cy="256" r="177" fill="none" stroke="#FFF1C9" stroke-width="11"/>
+<g fill="none" stroke="#FFF1C9" stroke-width="6" stroke-linecap="round"><path d="M169 139 C111 194 111 318 169 373"/><path d="M343 139 C401 194 401 318 343 373"/></g>
+<g clip-path="url(#beerClip)"><path d="M205 273 Q250 286 307 270 L307 365 L205 365 Z" fill="#FF9D00"/><path d="M205 329 Q256 347 307 326 L307 365 L205 365 Z" fill="#E87300"/></g>
+<path d="M205 171 C205 151 222 142 239 148 C248 137 267 137 276 148 C294 142 311 151 311 171 Z" fill="#FFF1C9"/>
+<path d="M207 188 C206 237 210 286 220 350 Q256 365 292 350 C302 286 306 237 305 188" fill="none" stroke="#FFF1C9" stroke-width="13" stroke-linecap="square" stroke-linejoin="round"/><path d="M226 340 Q256 350 286 340" fill="none" stroke="#FFF1C9" stroke-width="8"/>
+<circle cx="273" cy="237" r="12" fill="#41DEDE" stroke="#FFF1C9" stroke-width="3"/><circle cx="249" cy="267" r="9" fill="#FF9D00" stroke="#FFF1C9" stroke-width="2"/><circle cx="267" cy="286" r="10" fill="#BFEFFF" stroke="#FFF1C9" stroke-width="2"/>
+</svg>)SVG";
+
 constexpr char kPortalGlobalStyle[] =
     "<style>"
     "*{box-sizing:border-box}"
@@ -93,24 +106,57 @@ constexpr char kPortalGlobalStyle[] =
     "background:#38596b;color:#eef5f8;border:1px solid #5e8191;"
     "border-radius:6px;text-decoration:none;font-weight:600}"
     ".home-link:hover{background:#486f80;border-color:#83a8b7}"
-    ".portal-menu-link{display:block;width:calc(100% - 32px);margin:16px;"
+     ".portal-menu-link{display:block;width:100%;margin:16px 0;"
     "padding:12px;text-align:center;background:#38596b;color:#eef5f8;"
     "border:1px solid #5e8191;border-radius:6px;text-decoration:none;"
     "font-size:1.05rem;font-weight:600}"
-    ".portal-menu-link:hover{background:#486f80;border-color:#83a8b7}"
-    "@media(max-width:520px){body{padding:12px}form{padding:16px}}"
+     ".portal-menu-link:hover{background:#486f80;border-color:#83a8b7}"
+     ".portal-action-form{padding:0!important;background:transparent!important;"
+     "border:0!important;border-radius:0!important;box-shadow:none!important;"
+     "margin:16px 0!important}"
+     ".portal-action-form button,.portal-menu-link{display:block;width:100%;"
+     "min-height:58px;padding:12px 16px;text-align:center;font-size:1.05rem;"
+     "font-weight:600}"
+     ".brand-banner{display:flex;align-items:center;justify-content:center;gap:16px;"
+     "width:100%;margin:0 0 24px;padding:14px 18px;background:#fff1c9;"
+     "border:1px solid #2a3a49;border-radius:12px;box-shadow:0 12px 32px #0005;"
+     "color:#071A2A;font-size:1.45rem;font-weight:600;letter-spacing:.02em}"
+     ".brand-banner img{width:64px;height:64px;display:block}"
+     ".device-name{margin-bottom:6px;color:#edf3f8;font-size:1.15rem;"
+     "font-weight:600}"
+     ".portal-nav{width:100%;margin:0 0 24px}.portal-divider{"
+     "border:0;border-top:1px solid #2a3a49;margin:24px 0 0}"
+     "@media(max-width:520px){body{padding:12px}form{padding:16px}}"
     "</style>"
     "<script>document.addEventListener('DOMContentLoaded',function(){"
-    "var w=document.querySelector('.wrap');if(!w)return;"
-    "if(location.pathname==='/' ){"
-    "var r=document.createElement('div');r.className='c';"
-    "var d=document.createElement('a');d.href='/display';d.textContent='Display';"
-    "d.className='portal-menu-link';r.appendChild(d);w.appendChild(r);return;}"
+     "var w=document.querySelector('.wrap');if(!w)return;"
+     "if(location.pathname==='/' ){"
+     "var b=document.createElement('div');b.className='brand-banner';"
+     "var i=document.createElement('img');i.src='/emblem.svg';i.alt='BrewSphere';"
+     "var t=document.createElement('span');t.textContent='BrewSphere';"
+     "b.appendChild(i);b.appendChild(t);w.prepend(b);"
+     "var nav=document.createElement('div');nav.className='portal-nav';"
+     "w.insertBefore(nav,w.children[1]);"
+     "function l(h,t){var r=document.createElement('div');r.className='c portal-action';"
+     "var a=document.createElement('a');a.href=h;a.textContent=t;"
+     "a.className='portal-menu-link';r.appendChild(a);nav.appendChild(r);}"
+     "l('/display','Display');l('/brew','Brewfather / Simulation');"
+     "var divider=document.createElement('hr');divider.className='portal-divider';nav.appendChild(divider);"
+     "w.querySelectorAll('form').forEach(function(f){"
+     "if(!f.querySelector('input,select,textarea'))f.classList.add('portal-action-form');});"
+     "var blocks=Array.from(w.children),status=blocks.find(function(e){"
+     "return /Connected to|Not connected/i.test(e.textContent);}),devicePanel=blocks.find(function(e){"
+     "return e!==status&&/esp32/i.test(e.textContent)&&/\\d{1,3}(?:\\.\\d{1,3}){3}/.test(e.textContent);});"
+     "if(status){var title=w.querySelector('h1');"
+     "if(title&&/^BrewSphere$/i.test(title.textContent.trim()))title.remove();"
+     "if(devicePanel){var device=document.createElement('div');device.className='device-name';"
+     "device.textContent=devicePanel.textContent.trim();status.prepend(device);devicePanel.remove();}"
+     "w.appendChild(status);}return;}"
     "var a=document.createElement('a');a.href='/';a.textContent='Home';"
     "a.className='home-link';w.prepend(a);"
     "});</script>";
 
-/** Separate from planeradar prefs (rangeInit) to avoid NVS handle conflicts. */
+/** Separate WiFiManager namespace for the force-portal flag. */
 constexpr char kWifiPrefsNamespace[] = "wifi";
 constexpr char kPrefsForcePortalKey[] = "portal";
 
@@ -140,16 +186,23 @@ void handleDisplayPage() {
                     "border:1px solid #526577;border-radius:8px}"
                     "a{display:inline-block;margin-top:16px;padding:8px 13px;"
                     "background:#38596b;color:#eef5f8;border:1px solid #5e8191;"
-                    "border-radius:6px;text-decoration:none}</style></head><body>"
+                     "border-radius:6px;text-decoration:none;margin:16px 6px 0}"
+                     "</style></head><body>"
                      "<main><h2>BrewSphere Display</h2>"
                     "<img id='display' src='/display.bmp'>"
                     "<script>setInterval(function(){document.getElementById('display').src="
                     "'/display.bmp?t='+Date.now()},5000);</script>"
-                    "<br><a href='/'>Home</a></main></body></html>");
+                     "<br><a href='/brew'>Datenquelle</a>"
+                     "<a href='/'>Home</a></main></body></html>");
 }
 
 void handleDisplayBmp() {
   if (!s_wm.server) {
+    return;
+  }
+  if (!ui::brewDisplayFrameAvailable()) {
+    s_wm.server->send(503, "text/plain",
+                      "Display preview unavailable: framebuffer allocation failed");
     return;
   }
   constexpr size_t kBmpSize = 54 + 240 * 240 * 3;
@@ -159,257 +212,299 @@ void handleDisplayBmp() {
   ui::brewDisplayWriteBmp(client);
 }
 
-constexpr int kCoordParamLen = 20;
-constexpr char kLatitudeInputAttrs[] =
-    "type=\"number\" step=\"0.000001\" min=\"-90\" max=\"90\"";
-constexpr char kLongitudeInputAttrs[] =
-    "type=\"number\" step=\"0.000001\" min=\"-180\" max=\"180\"";
+void appendHtmlEscaped(String& html, const char* value) {
+  if (value == nullptr) {
+    return;
+  }
+  while (*value != '\0') {
+    switch (*value++) {
+      case '&':
+        html += F("&amp;");
+        break;
+      case '<':
+        html += F("&lt;");
+        break;
+      case '>':
+        html += F("&gt;");
+        break;
+      case '\"':
+        html += F("&quot;");
+        break;
+      case '\'':
+        html += F("&#39;");
+        break;
+      default:
+        html += value[-1];
+        break;
+    }
+  }
+}
+
+void appendTextInput(String& html, const char* name, const char* label,
+                     const char* value, int max_length) {
+  html += F("<label for='");
+  html += name;
+  html += F("'>");
+  html += label;
+  html += F("</label><input id='");
+  html += name;
+  html += F("' name='");
+  html += name;
+  html += F("' type='text' maxlength='");
+  html += max_length;
+  html += F("' value='");
+  appendHtmlEscaped(html, value);
+  html += F("'>");
+}
+
+void appendNumberInput(String& html, const char* name, const char* label,
+                       const String& value, const char* minimum,
+                       const char* maximum, const char* step) {
+  html += F("<label for='");
+  html += name;
+  html += F("'>");
+  html += label;
+  html += F("</label><input id='");
+  html += name;
+  html += F("' name='");
+  html += name;
+  html += F("' type='number' min='");
+  html += minimum;
+  html += F("' max='");
+  html += maximum;
+  html += F("' step='");
+  html += step;
+  html += F("' value='");
+  html += value;
+  html += F("'><input class='range' type='range' tabindex='-1' aria-label='");
+  html += label;
+  html += F(" Schieberegler' data-number='");
+  html += name;
+  html += F("' min='");
+  html += minimum;
+  html += F("' max='");
+  html += maximum;
+  html += F("' step='");
+  html += step;
+  html += F("' value='");
+  html += value;
+  html += F("'>");
+}
+
+bool settingsWriteAuthenticated() {
+  if (!s_wm.server) {
+    return false;
+  }
+  if (s_wm.server->authenticate(config::kOtaUsername,
+                                services::settings::otaPassword())) {
+    return true;
+  }
+  s_wm.server->requestAuthentication();
+  return false;
+}
+
+char s_brew_csrf_token[17] = {};
+
+void ensureBrewCsrfToken() {
+  if (s_brew_csrf_token[0] == '\0') {
+    snprintf(s_brew_csrf_token, sizeof(s_brew_csrf_token), "%08lx%08lx",
+             static_cast<unsigned long>(esp_random()),
+             static_cast<unsigned long>(esp_random()));
+  }
+}
+
+bool brewCsrfValid(WebServer& web) {
+  ensureBrewCsrfToken();
+  return web.arg("csrf") == s_brew_csrf_token;
+}
+
+void handleBrewSettingsPage() {
+  if (!s_wm.server || !settingsWriteAuthenticated()) {
+    return;
+  }
+  const services::brew::SimulatedValues& simulated =
+      services::brew::simulatedValues();
+  const services::brew::BrewfatherCredentials& credentials =
+      services::brew::brewfatherCredentials();
+  const bool simulation = services::brew::sourceMode() ==
+                          services::brew::SourceMode::kSimulated;
+  ensureBrewCsrfToken();
+
+  String html;
+   html.reserve(8500);
+  html += F(
+      "<!doctype html><html lang='de'><head><meta charset='utf-8'>"
+      "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+      "<title>BrewSphere Datenquelle</title><style>"
+      "*{box-sizing:border-box}body{margin:0;padding:20px;background:#0d151e;"
+      "color:#d7e0e9;font:15px/1.45 Segoe UI,Arial,sans-serif}"
+      "main{max-width:680px;margin:auto}form{padding:24px;background:#141f2a;"
+      "border:1px solid #2a3a49;border-radius:12px;box-shadow:0 12px 32px #0005}"
+      "h1{margin:0 0 6px;color:#edf3f8;font-size:1.4rem}"
+      ".intro{margin:0 0 20px;color:#9aaabd}.grid{display:grid;"
+      "grid-template-columns:1fr 1fr;gap:14px 18px}.full{grid-column:1/-1}"
+      "label{display:block;margin:0 0 5px;color:#b8c6d3}"
+      "input,select{width:100%;padding:9px 10px;background:#0f1923;"
+      "color:#e4edf4;border:1px solid #35495b;border-radius:6px;font:inherit}"
+      "input:focus,select:focus{outline:0;border-color:#7098aa;"
+      "box-shadow:0 0 0 2px #7098aa33}.simulation{display:contents}"
+      ".range{grid-column:1/-1;margin-top:-7px;padding:0;accent-color:#41dede}"
+      ".check{grid-column:1/-1;"
+      "display:flex;align-items:center;gap:9px;padding:10px 12px;background:#0f1923;"
+      "border:1px solid #35495b;border-radius:6px}.check input{width:auto;margin:0}"
+      ".actions{display:flex;gap:10px;margin-top:22px;flex-wrap:wrap}"
+      ".live-status{align-self:center;color:#8eb5c5;min-width:9rem}"
+      "button,a{padding:9px 14px;background:#38596b;color:#eef5f8;"
+      "border:1px solid #5e8191;border-radius:6px;text-decoration:none;"
+      "font:inherit;cursor:pointer}button:hover,a:hover{background:#486f80}"
+      ".hint{grid-column:1/-1;padding:10px 12px;background:#1a2937;"
+      "border-left:3px solid #62899d;border-radius:6px;color:#aebdca}"
+      "@media(max-width:560px){body{padding:12px}form{padding:16px}"
+      ".grid{grid-template-columns:1fr}.full,.hint{grid-column:1}}"
+      "</style></head><body><main><form id='brewForm' method='post' action='/brew-save'>"
+      "<h1>BrewSphere Datenquelle</h1>"
+      "<p class='intro'>Zwischen echten Brewfather-Daten und frei einstellbaren "
+      "Testwerten wechseln.</p><div class='grid'><div class='full'>"
+      "<label for='brew_source'>Datenquelle</label>"
+      "<select id='brew_source' name='brew_source'>"
+      "<option value='brewfather'");
+  if (!simulation) {
+    html += F(" selected");
+  }
+  html += F(">Brewfather API</option><option value='simulated'");
+  if (simulation) {
+    html += F(" selected");
+  }
+  html += F(">Simulierte Werte</option></select>"
+            "<input type='hidden' name='csrf' value='");
+  html += s_brew_csrf_token;
+   html += F("'></div><div class='full'><label for='brew_user_id'>Brewfather User-ID</label><input id='brew_user_id' name='brew_user_id' type='text' maxlength='95' value='");
+   appendHtmlEscaped(html, credentials.user_id);
+   html += F("' autocomplete='username'></div><div class='full'><label for='brew_api_key'>Brewfather API-Key</label><input id='brew_api_key' name='brew_api_key' type='password' maxlength='159' value='' placeholder='Leer lassen, um den gespeicherten Key zu behalten' autocomplete='current-password'></div><div class='hint'>Zugangsdaten werden nur auf dem Gerät gespeichert. Der API-Key wird aus Sicherheitsgründen nicht wieder angezeigt.</div><div id='simulation' class='simulation'>"
+             "<p class='hint'>Änderungen werden live auf dem Display und in der "
+            "Webvorschau verwendet. Speichern übernimmt sie dauerhaft.</p>");
+  html += F("<label class='check'><input id='sim_demo' name='sim_demo' "
+            "type='checkbox'");
+  if (simulated.demo_mode) {
+    html += F(" checked");
+  }
+  html += F(">Demo-Modus: Werte ändern sich langsam automatisch</label>");
+  appendTextInput(html, "sim_batch_name", "Sudname", simulated.batch_name, 63);
+  appendTextInput(html, "sim_recipe_name", "Rezeptname", simulated.recipe_name,
+                  63);
+  appendTextInput(html, "sim_status",
+                  "Status (Fermenting, Brewing oder Conditioning)",
+                  simulated.status, 19);
+  appendNumberInput(html, "sim_batch_number", "Batchnummer",
+                    String(simulated.batch_number), "0", "9999", "1");
+  appendNumberInput(html, "sim_brew_day", "Brautag",
+                    String(simulated.brew_day), "0", "9999", "1");
+  appendNumberInput(html, "sim_plato", "Aktueller Wert (&deg;P)",
+                    String(simulated.plato, 1), "0", "40", "0.1");
+  appendNumberInput(html, "sim_target_plato", "Zielwert (&deg;P)",
+                    String(simulated.target_plato, 1), "0", "40", "0.1");
+  appendNumberInput(html, "sim_target_temp", "Solltemperatur (&deg;C)",
+                    String(simulated.target_temperature_c, 1), "-20", "100",
+                    "0.1");
+  appendNumberInput(html, "sim_fridge_temp", "Isttemperatur (&deg;C)",
+                    String(simulated.fridge_temperature_c, 1), "-20", "100",
+                    "0.1");
+  appendNumberInput(html, "sim_attenuation", "Verg&auml;rgrad (%)",
+                    String(simulated.attenuation_percent, 0), "0", "100",
+                    "1");
+  appendNumberInput(html, "sim_end_attenuation",
+                    "Endverg&auml;rgrad / Farbwechsel (%)",
+                    String(simulated.end_attenuation_percent, 0), "0", "100",
+                    "1");
+  html += F(
+      "</div></div><div class='actions'><button type='submit'>Speichern</button>"
+      "<a href='/display'>Display ansehen</a><a href='/'>Home</a>"
+      "<span id='liveStatus' class='live-status'>Live bereit</span></div></form>"
+      "</main><script>(function(){var form=document.getElementById('brewForm'),"
+      "source=document.getElementById('brew_source'),"
+      "fields=document.getElementById('simulation'),"
+      "status=document.getElementById('liveStatus'),timer;function update(){"
+      "fields.style.display=source.value==='simulated'?'contents':'none';}"
+      "function live(){clearTimeout(timer);status.textContent='Änderung...';"
+      "timer=setTimeout(function(){fetch('/brew-live',{method:'POST',"
+      "body:new FormData(form),credentials:'same-origin'}).then(function(response){"
+      "if(!response.ok)throw new Error();status.textContent='Live aktualisiert';})"
+      ".catch(function(){status.textContent='Eingabe prüfen';});},300);}"
+      "document.querySelectorAll('.range').forEach(function(range){"
+      "range.addEventListener('input',function(){document.getElementById("
+      "range.dataset.number).value=range.value;});});"
+      "form.querySelectorAll('input[type=number]').forEach(function(number){"
+      "number.addEventListener('input',function(){var range=form.querySelector("
+      "'.range[data-number=\"'+number.id+'\"]');if(range)range.value=number.value;});});"
+      "form.addEventListener('input',live);source.addEventListener('change',"
+      "function(){update();live();});update();})();</script>"
+      "</body></html>");
+  s_wm.server->send(200, "text/html; charset=utf-8", html);
+}
+
+bool applyBrewSettingsRequest(WebServer& web, bool persist_values) {
+  const bool brewfather_requested = web.arg("brew_source") != "simulated";
+  const bool credentials_valid = services::brew::saveCredentialsFromPortal(
+      web.arg("brew_user_id").c_str(), web.arg("brew_api_key").c_str(),
+      persist_values);
+  if (brewfather_requested && !credentials_valid) {
+    return false;
+  }
+  return services::brew::saveFromPortal(
+      web.arg("brew_source").c_str(), web.arg("sim_batch_name").c_str(),
+      web.arg("sim_recipe_name").c_str(), web.arg("sim_status").c_str(),
+      web.arg("sim_demo").c_str(),
+      web.arg("sim_batch_number").c_str(), web.arg("sim_brew_day").c_str(),
+      web.arg("sim_plato").c_str(), web.arg("sim_target_plato").c_str(),
+      web.arg("sim_target_temp").c_str(), web.arg("sim_fridge_temp").c_str(),
+      web.arg("sim_attenuation").c_str(),
+      web.arg("sim_end_attenuation").c_str(), persist_values);
+}
+
+void handleBrewSettingsLive() {
+  if (!s_wm.server || !settingsWriteAuthenticated()) {
+    return;
+  }
+  WebServer& web = *s_wm.server;
+  if (!brewCsrfValid(web)) {
+    web.send(403, "text/plain", "Invalid form token");
+    return;
+  }
+  if (!applyBrewSettingsRequest(web, false)) {
+    web.send(400, "text/plain", "Invalid simulation values");
+    return;
+  }
+  services::weather::requestRefresh();
+  web.send(204, "text/plain", "");
+}
+
+void handleBrewSettingsSaved() {
+  if (!s_wm.server || !settingsWriteAuthenticated()) {
+    return;
+  }
+  WebServer& web = *s_wm.server;
+  if (!brewCsrfValid(web)) {
+    web.send(403, "text/plain", "Invalid form token");
+    return;
+  }
+  const bool saved = applyBrewSettingsRequest(web, true);
+  if (!saved) {
+    web.send(400, "text/html; charset=utf-8",
+             "<!doctype html><html lang='de'><meta charset='utf-8'>"
+             "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+             "<body style='font-family:Segoe UI,Arial,sans-serif;background:#0d151e;"
+              "color:#d7e0e9;padding:2rem'><h2>Ungültige Brewfather- oder Simulationsdaten</h2>"
+              "<p>Bitte Zugangsdaten und Eingabebereiche prüfen.</p><a style='color:#8eb5c5' "
+             "href='/brew'>Zurück</a></body></html>");
+    return;
+  }
+  services::weather::requestRefresh();
+  web.sendHeader("Location", "/brew", true);
+  web.send(303, "text/plain", "Saved");
+}
+
 constexpr int kOtaPasswordParamLen =
     static_cast<int>(services::settings::kOtaPasswordMaxLen);
-constexpr int kTextScaleParamLen = 4;
-
-WiFiManagerParameter s_param_lat("radar_lat", "Latitude (deg)", "0",
-                                kCoordParamLen, kLatitudeInputAttrs);
-WiFiManagerParameter s_param_lon("radar_lon", "Longitude (deg)", "0",
-                                kCoordParamLen, kLongitudeInputAttrs);
-char s_miles_checkbox_attrs[32] = "type=\"checkbox\"";
-WiFiManagerParameter s_param_miles("use_miles", "Display distances in miles", "T", 2,
-                                   s_miles_checkbox_attrs, WFM_LABEL_AFTER);
-
-char s_runways_checkbox_attrs[32] = "type=\"checkbox\"";
-WiFiManagerParameter s_param_runways("show_runways", "Show airport runways", "T", 2,
-                                     s_runways_checkbox_attrs, WFM_LABEL_AFTER);
-constexpr char kRangeInputAttrs[] =
-    "type=\"range\" min=\"0\" max=\"3\" step=\"1\" "
-    "title=\"5 km / 10 km / 15 km / 25 km\" "
-    "oninput=\"document.getElementById('range_value').value="
-    "['5 km','10 km','15 km','25 km'][this.value]\"";
-WiFiManagerParameter s_param_range(
-    "range_index", "Radar range (5 / 10 / 15 / 25 km)", "1", 2,
-    kRangeInputAttrs);
-WiFiManagerParameter s_param_range_break("<br/>");
-WiFiManagerParameter s_param_range_output(
-    "<div style=\"text-align:center;margin-top:-5px\">"
-    "<output id=\"range_value\">10 km</output></div>"
-    "<script>(function(){var s=document.getElementById('range_index'),"
-    "o=document.getElementById('range_value'),v=['5 km','10 km','15 km','25 km'];"
-    "if(s&&o)o.value=v[s.value]||'10 km';})();</script>");
-
-char s_footer_checkbox_attrs[32] = "type=\"checkbox\"";
-WiFiManagerParameter s_param_footer("show_footer", "Show weather and clock", "T",
-                                    2, s_footer_checkbox_attrs,
-                                    WFM_LABEL_AFTER);
-
-char s_weather_checkbox_attrs[32] = "type=\"checkbox\"";
-WiFiManagerParameter s_param_weather(
-    "show_weather", "Show current weather", "T", 2,
-    s_weather_checkbox_attrs, WFM_LABEL_AFTER);
-
-char s_fahrenheit_checkbox_attrs[32] = "type=\"checkbox\"";
-WiFiManagerParameter s_param_fahrenheit(
-    "temp_f", "Temperature in Fahrenheit", "T", 2,
-    s_fahrenheit_checkbox_attrs, WFM_LABEL_AFTER);
-
-char s_altitude_metres_checkbox_attrs[32] = "type=\"checkbox\"";
-WiFiManagerParameter s_param_altitude_metres(
-    "alt_m", "Display altitude in metres", "T", 2,
-    s_altitude_metres_checkbox_attrs, WFM_LABEL_AFTER);
-
-char s_clock24_checkbox_attrs[32] = "type=\"checkbox\"";
-WiFiManagerParameter s_param_clock24("clock_24", "Use 24-hour clock", "T", 2,
-                                     s_clock24_checkbox_attrs,
-                                     WFM_LABEL_AFTER);
-
-WiFiManagerParameter s_param_after_clock_break("<br/>");
-
-constexpr char kTextScaleAttrs[] =
-    "type=\"range\" min=\"80\" max=\"130\" step=\"5\" "
-    "oninput=\"document.getElementById('text_scale_value').value="
-    "this.value+'%'\"";
-WiFiManagerParameter s_param_text_scale(
-    "text_scale", "Radar text size", "120", kTextScaleParamLen,
-    kTextScaleAttrs);
-WiFiManagerParameter s_param_text_scale_output(
-    "<div style=\"text-align:center;margin-top:-5px\">"
-    "<output id=\"text_scale_value\" for=\"text_scale\"></output></div>"
-    "<script>(function(){var s=document.getElementById('text_scale'),"
-    "o=document.getElementById('text_scale_value');"
-      "if(s&&o)o.value=s.value+'%';})();</script>");
-char s_night_checkbox_attrs[32] = "type=\"checkbox\"";
-WiFiManagerParameter s_param_night_enabled(
-    "night_enabled", "Enable night mode", "T", 2,
-    s_night_checkbox_attrs, WFM_LABEL_AFTER);
-WiFiManagerParameter s_param_night_break("<br/>");
-constexpr char kNightTimeAttrs[] = "type=\"time\"";
-WiFiManagerParameter s_param_night_start(
-    "night_start", "Night mode start", "22:00", 6, kNightTimeAttrs);
-WiFiManagerParameter s_param_night_end(
-    "night_end", "Night mode end", "07:00", 6, kNightTimeAttrs);
-
-constexpr char kColorInputAttrs[] = "type=\"color\"";
-constexpr int kColorInputLen = 8;
-WiFiManagerParameter s_param_color_background("color_bg", "Background", "#040a1c",
-                                               kColorInputLen, kColorInputAttrs);
-WiFiManagerParameter s_param_color_grid("color_grid", "Grid", "#106420",
-                                         kColorInputLen, kColorInputAttrs);
-WiFiManagerParameter s_param_color_label("color_label", "Labels", "#ffffff",
-                                          kColorInputLen, kColorInputAttrs);
-WiFiManagerParameter s_param_color_center("color_center", "Center marker", "#ffffff",
-                                           kColorInputLen, kColorInputAttrs);
-WiFiManagerParameter s_param_color_aircraft("color_aircraft", "Aircraft", "#ff0000",
-                                              kColorInputLen, kColorInputAttrs);
-WiFiManagerParameter s_param_color_track("color_track", "Track vector", "#ff00ff",
-                                          kColorInputLen, kColorInputAttrs);
-WiFiManagerParameter s_param_color_tag_type("color_tag_type", "Aircraft type", "#ffc800",
-                                              kColorInputLen, kColorInputAttrs);
-WiFiManagerParameter s_param_color_tag_alt("color_tag_alt", "Altitude", "#5ac8ff",
-                                            kColorInputLen, kColorInputAttrs);
-WiFiManagerParameter s_param_color_runway("color_runway", "Runways", "#3896aa",
-                                            kColorInputLen, kColorInputAttrs);
-WiFiManagerParameter s_param_color_runway_label("color_runway_label", "Runway labels", "#6ed2e6",
-                                                   kColorInputLen, kColorInputAttrs);
-WiFiManagerParameter s_param_color_footer("color_footer", "Footer background", "#031020",
-                                           kColorInputLen, kColorInputAttrs);
-WiFiManagerParameter s_param_color_road("color_road", "Motorways", "#69737d",
-                                          kColorInputLen, kColorInputAttrs);
-WiFiManagerParameter s_param_color_road_primary("color_road_primary", "Primary roads", "#3c4650",
-                                                 kColorInputLen, kColorInputAttrs);
-WiFiManagerParameter s_param_color_city("color_city", "Cities", "#aaaaaa",
-                                         kColorInputLen, kColorInputAttrs);
-
-char s_show_grid_attrs[32] = "type=\"checkbox\"";
-char s_show_center_attrs[32] = "type=\"checkbox\"";
-char s_show_label_attrs[32] = "type=\"checkbox\"";
-char s_show_aircraft_attrs[32] = "type=\"checkbox\"";
-char s_show_track_attrs[32] = "type=\"checkbox\"";
-char s_show_tag_type_attrs[32] = "type=\"checkbox\"";
-char s_show_tag_alt_attrs[32] = "type=\"checkbox\"";
-char s_show_runway_attrs[32] = "type=\"checkbox\"";
-char s_show_runway_label_attrs[32] = "type=\"checkbox\"";
-char s_show_road_attrs[32] = "type=\"checkbox\"";
-char s_show_road_primary_attrs[32] = "type=\"checkbox\"";
-char s_show_city_attrs[32] = "type=\"checkbox\"";
-WiFiManagerParameter s_param_show_grid("show_grid", "Show grid", "T", 2,
-                                        s_show_grid_attrs, WFM_LABEL_AFTER);
-WiFiManagerParameter s_param_show_center("show_center", "Show center", "T", 2,
-                                          s_show_center_attrs, WFM_LABEL_AFTER);
-WiFiManagerParameter s_param_show_label("show_label", "Show labels", "T", 2,
-                                         s_show_label_attrs, WFM_LABEL_AFTER);
-WiFiManagerParameter s_param_show_aircraft("show_aircraft", "Show aircraft", "T", 2,
-                                            s_show_aircraft_attrs, WFM_LABEL_AFTER);
-WiFiManagerParameter s_param_show_track("show_track", "Show track vector", "T", 2,
-                                         s_show_track_attrs, WFM_LABEL_AFTER);
-WiFiManagerParameter s_param_show_tag_type("show_tag_type", "Show aircraft type", "T", 2,
-                                            s_show_tag_type_attrs, WFM_LABEL_AFTER);
-WiFiManagerParameter s_param_show_tag_alt("show_tag_alt", "Show altitude", "T", 2,
-                                           s_show_tag_alt_attrs, WFM_LABEL_AFTER);
-WiFiManagerParameter s_param_show_runway("show_runway", "Show runways", "T", 2,
-                                          s_show_runway_attrs, WFM_LABEL_AFTER);
-WiFiManagerParameter s_param_show_runway_label("show_runway_label", "Show runway labels", "T", 2,
-                                                s_show_runway_label_attrs, WFM_LABEL_AFTER);
-WiFiManagerParameter s_param_show_road("show_road", "Show roads", "T", 2,
-                                        s_show_road_attrs, WFM_LABEL_AFTER);
-WiFiManagerParameter s_param_show_road_primary(
-    "show_road_primary", "Show primary roads", "T", 2,
-    s_show_road_primary_attrs, WFM_LABEL_AFTER);
-WiFiManagerParameter s_param_show_city("show_city", "Show cities", "T", 2,
-                                        s_show_city_attrs, WFM_LABEL_AFTER);
-WiFiManagerParameter s_param_color_group_background(
-    "<h3 style='margin:1.2rem 0 .4rem'>Hintergrundkarte</h3>");
-WiFiManagerParameter s_param_color_group_grid(
-    "<h3 style='margin:1.2rem 0 .4rem'>Raster</h3>");
-WiFiManagerParameter s_param_color_group_aircraft(
-    "<h3 style='margin:1.2rem 0 .4rem'>Flugzeuge</h3>");
-WiFiManagerParameter s_param_color_group_general(
-    "<h3 style='margin:1.2rem 0 .4rem'>Allgemein</h3>");
-WiFiManagerParameter s_param_color_reset_controls(
-    "<script>(function(){"
-    "var style=document.createElement('style');"
-    "style.textContent=\""
-    "*{box-sizing:border-box;}"
-    "body{margin:0;padding:24px;background:#0d151e;color:#d7e0e9;"
-    "font-family:Segoe UI,Arial,sans-serif;font-size:15px;line-height:1.45;}"
-    "body>div,body>form,form{max-width:760px;margin:0 auto;}"
-    "form{padding:24px;background:#141f2a;border:1px solid #2a3a49;"
-    "border-radius:12px;box-shadow:0 12px 32px #0005;}"
-    "h1,h2,h3{color:#edf3f8;font-weight:600;letter-spacing:.01em;}"
-    "h1{font-size:1.35rem;margin:0 0 1.2rem;}"
-    "h2{font-size:1.05rem;margin:1.5rem 0 .6rem;}"
-    ".c{float:none!important;clear:both!important;width:100%!important;}"
-    "h3{clear:both!important;width:100%!important;font-size:1rem;"
-    "margin:1.5rem 0 .7rem!important;padding:10px 12px;"
-    "background:#1a2937;border-left:3px solid #62899d;border-radius:6px;}"
-    "label{color:#b8c6d3;}"
-    "input[type=text],input[type=password],input[type=number],select{"
-    "width:100%;padding:9px 10px;background:#0f1923;color:#e4edf4;"
-    "border:1px solid #35495b;border-radius:6px;outline:none;}"
-    "input[type=text]:focus,input[type=password]:focus,input[type=number]:focus{"
-    "border-color:#7098aa;box-shadow:0 0 0 2px #7098aa33;}"
-    "input[type=color]{width:52px;height:32px;padding:3px;"
-    "background:#0f1923;border:1px solid #526577;border-radius:5px;}"
-    "input[type=range]{accent-color:#7098aa;}"
-    "input[type=checkbox]{accent-color:#7098aa;}"
-    "button,input[type=submit]{padding:8px 13px;background:#38596b;"
-    "color:#eef5f8;border:1px solid #5e8191;border-radius:6px;"
-    "font:inherit;cursor:pointer;transition:background .15s,border-color .15s;}"
-    "button:hover,input[type=submit]:hover{background:#486f80;border-color:#83a8b7;}"
-    ".color-controls{min-width:170px;}"
-    "@media(max-width:520px){body{padding:12px;}form{padding:16px;}"
-    ".color-controls{min-width:145px;}}"
-    "a{color:#8eb5c5;}"
-    "small{color:#9aaabd;}"
-    "\";"
-    "document.head.appendChild(style);"
-    "document.querySelectorAll('.wrap,.wrap form,.wrap form>div').forEach(function(e){"
-    "e.style.setProperty('float','none','important');"
-    "e.style.setProperty('clear','both','important');"
-    "e.style.setProperty('width','100%','important');"
-    "e.style.setProperty('display','block','important');});"
-    "var d={color_bg:'#040a1c',color_grid:'#106420',"
-    "color_label:'#ffffff',color_center:'#ffffff',"
-    "color_aircraft:'#ff0000',color_track:'#ff00ff',"
-    "color_tag_type:'#ffc800',color_tag_alt:'#5ac8ff',"
-    "color_runway:'#3896aa',color_runway_label:'#6ed2e6',"
-    "color_footer:'#031020',color_road:'#69737d',"
-    "color_road_primary:'#3c4650',color_city:'#aaaaaa'};"
-    "var v={color_grid:'show_grid',color_center:'show_center',"
-    "color_label:'show_label',color_aircraft:'show_aircraft',"
-    "color_track:'show_track',color_tag_type:'show_tag_type',"
-    "color_tag_alt:'show_tag_alt',color_runway:'show_runway',"
-    "color_runway_label:'show_runway_label',color_road:'show_road',"
-    "color_road_primary:'show_road_primary',color_city:'show_city'};"
-    "Object.keys(d).forEach(function(id){"
-    "var i=document.getElementById(id);if(!i)return;"
-    "var p=i.parentNode;"
-    "var r=p.parentNode;"
-    "[p,r].forEach(function(e){e.style.setProperty('float','none','important');"
-    "e.style.setProperty('clear','both','important');"
-    "e.style.setProperty('width','100%','important');"
-    "e.style.setProperty('box-sizing','border-box','important');});"
-    "var c=document.createElement('span');"
-    "c.className='color-controls';"
-    "c.style.display='grid';c.style.gridTemplateColumns='4rem auto auto';"
-    "c.style.alignItems='center';c.style.gap='8px';"
-    "var b=document.createElement('button');b.type='button';"
-    "b.textContent='Standard';b.style.margin='0';"
-    "b.onclick=function(){i.value=d[id];};"
-    "i.style.display='block';i.style.margin='0';"
-    "p.replaceChild(c,i);c.appendChild(i);c.appendChild(b);"
-    "var x=document.getElementById(v[id]);"
-    "if(x){var xp=x.parentNode;xp.style.display='none';"
-    "var xl=document.querySelector('label[for=\"'+v[id]+'\"]');"
-    "if(xl)xl.style.display='none';"
-    "var q=document.createElement('label');q.style.whiteSpace='nowrap';"
-    "x.style.display='inline-block';x.title='Anzeigen';q.appendChild(x);"
-    "q.appendChild(document.createTextNode(' Anzeigen'));c.appendChild(q);}"
-    "p.style.display='grid';p.style.gridTemplateColumns='minmax(9rem,1fr) auto';"
-    "p.style.alignItems='center';p.style.gap='8px';"
-    "});"
-    "document.querySelectorAll('h3').forEach(function(h){"
-    "var q=h.parentNode;q.style.setProperty('float','none','important');"
-    "q.style.setProperty('clear','both','important');"
-    "q.style.setProperty('width','100%','important');});"
-    "})();</script>");
 
 constexpr char kOtaPasswordAttrs[] =
     "type=\"password\" autocomplete=\"new-password\" "
@@ -418,260 +513,9 @@ WiFiManagerParameter s_param_ota_password(
     "ota_password", "OTA password (user: admin)", "", kOtaPasswordParamLen,
     kOtaPasswordAttrs);
 
-void refreshCheckboxAttrs(char* attrs, size_t attrs_len, bool checked) {
-  snprintf(attrs, attrs_len, "type=\"checkbox\"%s",
-           checked ? " checked" : "");
-}
-
-void refreshPortalParamDefaults() {
-  char lat_buf[kCoordParamLen + 1];
-  char lon_buf[kCoordParamLen + 1];
-  snprintf(lat_buf, sizeof(lat_buf), "%.6f", services::location::lat());
-  snprintf(lon_buf, sizeof(lon_buf), "%.6f", services::location::lon());
-  s_param_lat.setValue(lat_buf, kCoordParamLen);
-  s_param_lon.setValue(lon_buf, kCoordParamLen);
-  refreshCheckboxAttrs(s_miles_checkbox_attrs,
-                       sizeof(s_miles_checkbox_attrs),
-                       ui::radar::useMiles());
-  s_param_miles.setValue("T", 2);
-  refreshCheckboxAttrs(s_runways_checkbox_attrs,
-                       sizeof(s_runways_checkbox_attrs),
-                       ui::radar::showRunways());
-  s_param_runways.setValue("T", 2);
-  char range_buf[3];
-  snprintf(range_buf, sizeof(range_buf), "%u",
-           static_cast<unsigned>(ui::radar::rangeIndex()));
-  s_param_range.setValue(range_buf, 2);
-  refreshCheckboxAttrs(s_footer_checkbox_attrs,
-                       sizeof(s_footer_checkbox_attrs),
-                       services::settings::footerEnabled());
-  s_param_footer.setValue("T", 2);
-  refreshCheckboxAttrs(s_weather_checkbox_attrs,
-                       sizeof(s_weather_checkbox_attrs),
-                       services::settings::weatherEnabled());
-  s_param_weather.setValue("T", 2);
-  refreshCheckboxAttrs(s_fahrenheit_checkbox_attrs,
-                       sizeof(s_fahrenheit_checkbox_attrs),
-                       services::settings::temperatureFahrenheit());
-  s_param_fahrenheit.setValue("T", 2);
-  refreshCheckboxAttrs(s_altitude_metres_checkbox_attrs,
-                     sizeof(s_altitude_metres_checkbox_attrs),
-                     services::settings::altitudeMetres());
-  s_param_altitude_metres.setValue("T", 2);
-  refreshCheckboxAttrs(s_clock24_checkbox_attrs,
-                       sizeof(s_clock24_checkbox_attrs),
-                       services::settings::use24HourClock());
-  s_param_clock24.setValue("T", 2);
-  char text_scale_buf[kTextScaleParamLen + 1];
-  snprintf(text_scale_buf, sizeof(text_scale_buf), "%d",
-           services::settings::textScalePercent());
-  s_param_text_scale.setValue(text_scale_buf, kTextScaleParamLen);
-  refreshCheckboxAttrs(s_night_checkbox_attrs, sizeof(s_night_checkbox_attrs),
-                       services::settings::nightModeEnabled());
-  s_param_night_enabled.setValue("T", 2);
-  char night_start_buf[6];
-  char night_end_buf[6];
-  snprintf(night_start_buf, sizeof(night_start_buf), "%02u:%02u",
-           services::settings::nightStartMinute() / 60,
-           services::settings::nightStartMinute() % 60);
-  snprintf(night_end_buf, sizeof(night_end_buf), "%02u:%02u",
-           services::settings::nightEndMinute() / 60,
-           services::settings::nightEndMinute() % 60);
-  s_param_night_start.setValue(night_start_buf, 6);
-  s_param_night_end.setValue(night_end_buf, 6);
-  s_param_ota_password.setValue("", kOtaPasswordParamLen);
-
-  const auto setColor = [](WiFiManagerParameter& param,
-                           services::settings::ColorId id) {
-    char value[8];
-    snprintf(value, sizeof(value), "#%06lX",
-             static_cast<unsigned long>(services::settings::color(id)));
-    for (char* p = value + 1; *p != '\0'; ++p) {
-      if (*p >= 'A' && *p <= 'F') {
-        *p = static_cast<char>(*p - 'A' + 'a');
-      }
-    }
-    param.setValue(value, kColorInputLen);
-  };
-  setColor(s_param_color_background, services::settings::ColorId::kBackground);
-  setColor(s_param_color_grid, services::settings::ColorId::kGrid);
-  setColor(s_param_color_label, services::settings::ColorId::kLabel);
-  setColor(s_param_color_center, services::settings::ColorId::kCenter);
-  setColor(s_param_color_aircraft, services::settings::ColorId::kAircraft);
-  setColor(s_param_color_track, services::settings::ColorId::kTrackVector);
-  setColor(s_param_color_tag_type, services::settings::ColorId::kTagType);
-  setColor(s_param_color_tag_alt, services::settings::ColorId::kTagAltitude);
-  setColor(s_param_color_runway, services::settings::ColorId::kRunway);
-  setColor(s_param_color_runway_label, services::settings::ColorId::kRunwayLabel);
-  setColor(s_param_color_footer, services::settings::ColorId::kFooterBackground);
-  setColor(s_param_color_road, services::settings::ColorId::kRoad);
-  setColor(s_param_color_road_primary,
-           services::settings::ColorId::kRoadPrimary);
-  setColor(s_param_color_city, services::settings::ColorId::kCity);
-
-  const auto setVisibility = [](char* attrs, size_t attrs_len,
-                                WiFiManagerParameter& param,
-                                services::settings::VisibilityId id) {
-    refreshCheckboxAttrs(attrs, attrs_len,
-                         services::settings::visible(id));
-    param.setValue("T", 2);
-  };
-  setVisibility(s_show_grid_attrs, sizeof(s_show_grid_attrs), s_param_show_grid,
-                services::settings::VisibilityId::kGrid);
-  setVisibility(s_show_center_attrs, sizeof(s_show_center_attrs), s_param_show_center,
-                services::settings::VisibilityId::kCenter);
-  setVisibility(s_show_label_attrs, sizeof(s_show_label_attrs), s_param_show_label,
-                services::settings::VisibilityId::kLabel);
-  setVisibility(s_show_aircraft_attrs, sizeof(s_show_aircraft_attrs), s_param_show_aircraft,
-                services::settings::VisibilityId::kAircraft);
-  setVisibility(s_show_track_attrs, sizeof(s_show_track_attrs), s_param_show_track,
-                services::settings::VisibilityId::kTrackVector);
-  setVisibility(s_show_tag_type_attrs, sizeof(s_show_tag_type_attrs), s_param_show_tag_type,
-                services::settings::VisibilityId::kTagType);
-  setVisibility(s_show_tag_alt_attrs, sizeof(s_show_tag_alt_attrs), s_param_show_tag_alt,
-                services::settings::VisibilityId::kTagAltitude);
-  setVisibility(s_show_runway_attrs, sizeof(s_show_runway_attrs), s_param_show_runway,
-                services::settings::VisibilityId::kRunway);
-  setVisibility(s_show_runway_label_attrs, sizeof(s_show_runway_label_attrs),
-                s_param_show_runway_label,
-                services::settings::VisibilityId::kRunwayLabel);
-  setVisibility(s_show_road_attrs, sizeof(s_show_road_attrs), s_param_show_road,
-                services::settings::VisibilityId::kRoad);
-  setVisibility(s_show_road_primary_attrs, sizeof(s_show_road_primary_attrs),
-                s_param_show_road_primary,
-                services::settings::VisibilityId::kRoadPrimary);
-  setVisibility(s_show_city_attrs, sizeof(s_show_city_attrs), s_param_show_city,
-                services::settings::VisibilityId::kCity);
-}
-
 void onPortalParamsSaved() {
-  if (!services::location::saveFromStrings(s_param_lat.getValue(),
-                                           s_param_lon.getValue())) {
-    Serial.println("Invalid lat/lon in portal — keeping previous location");
-  }
-  ui::radar::saveMilesFromPortal(s_param_miles.getValue());
-  ui::radar::saveRunwaysFromPortal(s_param_runways.getValue());
-  ui::radar::saveRangeFromPortal(s_param_range.getValue());
-  services::settings::saveFromPortal(
-    s_param_footer.getValue(), s_param_weather.getValue(),
-    s_param_fahrenheit.getValue(),
-    s_param_altitude_metres.getValue(),
-    s_param_clock24.getValue(),
-    s_param_text_scale.getValue(),
-    s_param_ota_password.getValue(),
-    s_param_night_enabled.getValue(),
-    s_param_night_start.getValue(), s_param_night_end.getValue());
-  services::settings::saveColorsFromPortal(
-      s_param_color_background.getValue(), s_param_color_grid.getValue(),
-      s_param_color_label.getValue(), s_param_color_center.getValue(),
-      s_param_color_aircraft.getValue(), s_param_color_track.getValue(),
-      s_param_color_tag_type.getValue(), s_param_color_tag_alt.getValue(),
-      s_param_color_runway.getValue(), s_param_color_runway_label.getValue(),
-      s_param_color_footer.getValue(), s_param_color_road.getValue(),
-      s_param_color_city.getValue(), s_param_color_road_primary.getValue());
-  services::settings::saveVisibilityFromPortal(
-      s_param_show_grid.getValue(), s_param_show_center.getValue(),
-      s_param_show_label.getValue(), s_param_show_aircraft.getValue(),
-      s_param_show_track.getValue(), s_param_show_tag_type.getValue(),
-      s_param_show_tag_alt.getValue(), s_param_show_runway.getValue(),
-      s_param_show_runway_label.getValue(), s_param_show_road.getValue(),
-      s_param_show_city.getValue(), s_param_show_road_primary.getValue());
-}
-
-void savePortalParamsFromRequest(WebServer& web) {
-  const String latitude = web.arg("radar_lat");
-  const String longitude = web.arg("radar_lon");
-  const String miles = web.arg("use_miles");
-  const String runways = web.arg("show_runways");
-  const String range_index = web.arg("range_index");
-  const String footer = web.arg("show_footer");
-  const String weather = web.arg("show_weather");
-  const String fahrenheit = web.arg("temp_f");
-  const String altitude_metres = web.arg("alt_m");
-  const String clock24 = web.arg("clock_24");
-  const String text_scale = web.arg("text_scale");
-  const String ota_password = web.arg("ota_password");
-  const String night_enabled = web.arg("night_enabled");
-  const String night_start = web.arg("night_start");
-  const String night_end = web.arg("night_end");
-  const String color_background = web.arg("color_bg");
-  const String color_grid = web.arg("color_grid");
-  const String color_label = web.arg("color_label");
-  const String color_center = web.arg("color_center");
-  const String color_aircraft = web.arg("color_aircraft");
-  const String color_track = web.arg("color_track");
-  const String color_tag_type = web.arg("color_tag_type");
-  const String color_tag_alt = web.arg("color_tag_alt");
-  const String color_runway = web.arg("color_runway");
-  const String color_runway_label = web.arg("color_runway_label");
-  const String color_footer = web.arg("color_footer");
-  const String color_road = web.arg("color_road");
-  const String color_road_primary = web.arg("color_road_primary");
-  const String color_city = web.arg("color_city");
-  const String show_grid = web.arg("show_grid");
-  const String show_center = web.arg("show_center");
-  const String show_label = web.arg("show_label");
-  const String show_aircraft = web.arg("show_aircraft");
-  const String show_track = web.arg("show_track");
-  const String show_tag_type = web.arg("show_tag_type");
-  const String show_tag_alt = web.arg("show_tag_alt");
-  const String show_runway = web.arg("show_runway");
-  const String show_runway_label = web.arg("show_runway_label");
-  const String show_road = web.arg("show_road");
-  const String show_road_primary = web.arg("show_road_primary");
-  const String show_city = web.arg("show_city");
-
-  if (!services::location::saveFromStrings(latitude.c_str(),
-                                           longitude.c_str())) {
-    Serial.println("Invalid lat/lon in portal — keeping previous location");
-  }
-  ui::radar::saveMilesFromPortal(miles.c_str());
-  ui::radar::saveRunwaysFromPortal(runways.c_str());
-  ui::radar::saveRangeFromPortal(range_index.c_str());
-  services::settings::saveFromPortal(
-    footer.c_str(), weather.c_str(), fahrenheit.c_str(),
-    altitude_metres.c_str(), clock24.c_str(),
-    text_scale.c_str(), ota_password.c_str(),
-    night_enabled.c_str(), night_start.c_str(), night_end.c_str());
-  services::settings::saveColorsFromPortal(
-      color_background.c_str(), color_grid.c_str(), color_label.c_str(),
-      color_center.c_str(), color_aircraft.c_str(), color_track.c_str(),
-      color_tag_type.c_str(), color_tag_alt.c_str(), color_runway.c_str(),
-      color_runway_label.c_str(), color_footer.c_str(), color_road.c_str(),
-      color_city.c_str(), color_road_primary.c_str());
-  services::settings::saveVisibilityFromPortal(
-      show_grid.c_str(), show_center.c_str(), show_label.c_str(),
-      show_aircraft.c_str(), show_track.c_str(), show_tag_type.c_str(),
-      show_tag_alt.c_str(), show_runway.c_str(), show_runway_label.c_str(),
-      show_road.c_str(), show_city.c_str(), show_road_primary.c_str());
-  refreshPortalParamDefaults();
-}
-
-void handleSettingsSaved() {
-  if (!s_wm.server) {
-    return;
-  }
-
-  WebServer& web = *s_wm.server;
-  savePortalParamsFromRequest(web);
-  web.send(
-      200, "text/html",
-      "<!doctype html><html lang='en'><head>"
-      "<meta charset='utf-8'>"
-      "<meta name='viewport' content='width=device-width,initial-scale=1'>"
-      "<meta http-equiv='refresh' content='3;url=/param'>"
-      "<title>Setup saved</title>"
-       "<style>body{font-family:Segoe UI,Arial,sans-serif;text-align:center;"
-       "background:#0d151e;color:#d7e0e9;margin:0;padding:3rem}"
-       ".msg{display:inline-block;min-width:16rem;text-align:left;padding:1.5rem;"
-       "background:#141f2a;border:1px solid #2a3a49;border-left:4px solid #62899d;"
-       "border-radius:12px;box-shadow:0 12px 32px #0005}a{color:#8eb5c5}"
-       ".home-link{display:inline-block;margin:0 0 16px;padding:8px 13px;"
-       "background:#38596b;color:#eef5f8;border:1px solid #5e8191;"
-       "border-radius:6px;text-decoration:none;font-weight:600}</style></head><body>"
-       "<div class='msg'><strong>Saved</strong><br>"
-       "<small>Returning to Setup in 3 seconds...</small><br><br>"
-       "<a class='home-link' href='/'>Home</a></div></body></html>");
+  services::settings::saveOtaPasswordFromPortal(
+      s_param_ota_password.getValue());
 }
 
 void attachSettingsRoutes() {
@@ -683,66 +527,19 @@ void attachSettingsRoutes() {
   s_wm.server->on("/favicon.ico", HTTP_GET, []() {
     s_wm.server->send(204, "text/plain", "");
   });
+  s_wm.server->on("/emblem.svg", HTTP_GET, []() {
+    s_wm.server->send_P(200, "image/svg+xml", kEmblemSvg);
+  });
   s_wm.server->on("/display", HTTP_GET, handleDisplayPage);
   s_wm.server->on("/display.bmp", HTTP_GET, handleDisplayBmp);
-  // Register before WiFiManager's built-in /paramsave handler so the custom
-  // confirmation can redirect back to Setup.
-  s_wm.server->on("/paramsave", HTTP_POST, handleSettingsSaved);
+  s_wm.server->on("/brew", HTTP_GET, handleBrewSettingsPage);
+  s_wm.server->on("/brew-live", HTTP_POST, handleBrewSettingsLive);
+  s_wm.server->on("/brew-save", HTTP_POST, handleBrewSettingsSaved);
 }
 
 void attachPortalParams(WiFiManager& wm) {
-  refreshPortalParamDefaults();
-  wm.addParameter(&s_param_lat);
-  wm.addParameter(&s_param_lon);
-  wm.addParameter(&s_param_miles);
-  wm.addParameter(&s_param_runways);
-  wm.addParameter(&s_param_range_break);
-  wm.addParameter(&s_param_range);
-  wm.addParameter(&s_param_range_output);
-  wm.addParameter(&s_param_footer);
-  wm.addParameter(&s_param_weather);
-  wm.addParameter(&s_param_fahrenheit);
-  wm.addParameter(&s_param_altitude_metres);
-  wm.addParameter(&s_param_clock24);
-  wm.addParameter(&s_param_after_clock_break);
-  wm.addParameter(&s_param_text_scale);
-  wm.addParameter(&s_param_text_scale_output);
-  wm.addParameter(&s_param_night_enabled);
-  wm.addParameter(&s_param_night_break);
-  wm.addParameter(&s_param_night_start);
-  wm.addParameter(&s_param_night_end);
+  s_param_ota_password.setValue("", kOtaPasswordParamLen);
   wm.addParameter(&s_param_ota_password);
-  wm.addParameter(&s_param_color_group_general);
-  wm.addParameter(&s_param_color_background);
-  wm.addParameter(&s_param_color_footer);
-  wm.addParameter(&s_param_color_group_background);
-  wm.addParameter(&s_param_color_road);
-  wm.addParameter(&s_param_show_road);
-  wm.addParameter(&s_param_color_road_primary);
-  wm.addParameter(&s_param_show_road_primary);
-  wm.addParameter(&s_param_color_runway);
-  wm.addParameter(&s_param_show_runway);
-  wm.addParameter(&s_param_color_runway_label);
-  wm.addParameter(&s_param_show_runway_label);
-  wm.addParameter(&s_param_color_city);
-  wm.addParameter(&s_param_show_city);
-  wm.addParameter(&s_param_color_group_grid);
-  wm.addParameter(&s_param_color_grid);
-  wm.addParameter(&s_param_show_grid);
-  wm.addParameter(&s_param_color_center);
-  wm.addParameter(&s_param_show_center);
-  wm.addParameter(&s_param_color_label);
-  wm.addParameter(&s_param_show_label);
-  wm.addParameter(&s_param_color_group_aircraft);
-  wm.addParameter(&s_param_color_aircraft);
-  wm.addParameter(&s_param_show_aircraft);
-  wm.addParameter(&s_param_color_track);
-  wm.addParameter(&s_param_show_track);
-  wm.addParameter(&s_param_color_tag_type);
-  wm.addParameter(&s_param_show_tag_type);
-  wm.addParameter(&s_param_color_tag_alt);
-  wm.addParameter(&s_param_show_tag_alt);
-  wm.addParameter(&s_param_color_reset_controls);
   wm.setSaveParamsCallback(onPortalParamsSaved);
 }
 
@@ -819,9 +616,9 @@ void resetWifiCredentials() {
   markForceConfigPortal();
   eraseWifiCredentials();
   services::location::clear();
-  ui::radar::unitsReset();
   services::settings::clear();
-  Serial.println("WiFi credentials, location, units, and display settings cleared");
+  services::brew::clear();
+  Serial.println("WiFi credentials, location, display, and brew settings cleared");
 }
 
 void onConfigPortalApStarted(WiFiManager*) {
@@ -854,7 +651,7 @@ void ensureWifiManager() {
                            IPAddress(255, 255, 255, 0));
   s_wm.setHostname(config::kPortalHostname);
   s_wm.setCustomHeadElement(kPortalGlobalStyle);
-  s_wm.setTitle("Plane Radar");
+  s_wm.setTitle("BrewSphere");
   s_wm.setAPCallback(onConfigPortalApStarted);
   attachPortalParams(s_wm);
   services::ota::configure(s_wm, attachSettingsRoutes);
@@ -866,7 +663,6 @@ void startLanWebPortal() {
       s_wm.getConfigPortalActive()) {
     return;
   }
-  refreshPortalParamDefaults();
   WiFi.mode(WIFI_STA);
   s_wm.setConfigPortalBlocking(false);
 #ifdef WM_MDNS
@@ -946,18 +742,6 @@ bool tryConnectWithUi(const String& ssid, const String& pass, bool show_ui) {
   }
 
   return false;
-}
-
-bool connectFallbackNetwork(bool show_ui) {
-  const String ssid = config::kWifiFallbackSSID;
-
-  if (ssid.length() == 0) {
-    return false;
-  }
-
-  Serial.printf("Trying compiled fallback WiFi: %s\n", ssid.c_str());
-
-  return tryConnectWithUi(ssid, config::kWifiFallbackPass, show_ui);
 }
 
 bool connectSavedNetwork(bool show_ui) {
@@ -1057,7 +841,7 @@ void wifiResetCredentialsAndReboot() {
 bool wifiReconnect() {
   initBootButton();
   Serial.println("WiFi reconnecting...");
-  return connectSavedNetwork(true) || connectFallbackNetwork(true);
+  return connectSavedNetwork(true);
 }
 
 void wifiLoop() {
@@ -1117,18 +901,19 @@ bool wifiSetupConnect() {
     return true;
   }
 
-  if (connectFallbackNetwork(true)) {
-    WiFi.setAutoReconnect(true);
-    Serial.printf("Connected with fallback WiFi: %s  IP %s\n",
-                  WiFi.SSID().c_str(),
-                  WiFi.localIP().toString().c_str());
-    return true;
+  if (storedWifiCredentials()) {
+    Serial.println("Saved WiFi could not connect — trying local fallback");
+  } else {
+    Serial.println("No saved WiFi — trying local fallback");
   }
 
-  if (storedWifiCredentials()) {
-    Serial.println("Saved and fallback WiFi could not connect — opening setup portal");
-  } else {
-    Serial.println("No saved or fallback WiFi — opening setup portal");
+  if (config::kWifiFallbackSSID[0] != '\0' &&
+      tryConnectWithUi(config::kWifiFallbackSSID, config::kWifiFallbackPass,
+                       true)) {
+    WiFi.setAutoReconnect(true);
+    Serial.printf("Connected to fallback WiFi: %s  IP %s\n",
+                  WiFi.SSID().c_str(), WiFi.localIP().toString().c_str());
+    return true;
   }
 
   if (openConfigPortal() && wifiLinkUp()) {

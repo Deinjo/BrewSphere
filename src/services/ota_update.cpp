@@ -13,7 +13,7 @@ namespace {
 constexpr char kFirmwarePage[] PROGMEM = R"HTML(
 <!doctype html><html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Plane Radar firmware</title>
+  <title>BrewSphere firmware</title>
 <style>
  body{font-family:Segoe UI,Arial,sans-serif;background:#0d151e;color:#d7e0e9;margin:0}
  main{max-width:34rem;margin:3rem auto;padding:1.5rem}
@@ -41,6 +41,8 @@ AdditionalRoutesFn s_additional_routes = nullptr;
 bool s_in_progress = false;
 bool s_upload_authenticated = false;
 String s_upload_error;
+unsigned long s_last_upload_activity_ms = 0;
+constexpr unsigned long kUploadStallTimeoutMs = 60000;
 
 WebServer* server() {
   if (s_manager == nullptr || !s_manager->server) {
@@ -91,12 +93,13 @@ void handleUploadChunk() {
     if (!s_upload_authenticated) {
       return;
     }
-    s_in_progress = true;
     if (!upload.filename.endsWith(".bin")) {
       s_upload_error = "Please select an OTA .bin application image";
       return;
     }
 
+    s_in_progress = true;
+    s_last_upload_activity_ms = millis();
     statusScreenFirmwareUpdate();
     Serial.printf("OTA: receiving %s\n", upload.filename.c_str());
     if (!Update.begin(UPDATE_SIZE_UNKNOWN, U_FLASH)) {
@@ -110,6 +113,7 @@ void handleUploadChunk() {
   }
 
   if (upload.status == UPLOAD_FILE_WRITE) {
+    s_last_upload_activity_ms = millis();
     if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
       recordUpdateError();
     }
@@ -122,6 +126,7 @@ void handleUploadChunk() {
   } else if (upload.status == UPLOAD_FILE_ABORTED) {
     s_upload_error = "Upload aborted";
     Update.end();
+    s_in_progress = false;
   }
 }
 
@@ -152,7 +157,7 @@ void handleUploadDone() {
   web->send(
       200, "text/html",
       "<!doctype html><meta name=viewport content='width=device-width'>"
-      "<h1>Update installed</h1><p>Plane Radar is restarting...</p>");
+      "<h1>Update installed</h1><p>BrewSphere is restarting...</p>");
   delay(250);
   web->client().stop();
   ESP.restart();
@@ -186,12 +191,20 @@ void configure(WiFiManager& manager, AdditionalRoutesFn additional_routes) {
   manager.setCustomMenuHTML(
       "<form action='/firmware' method='get'><button>Firmware update</button>"
       "</form><br/>\n");
-  const char* menu[] = {"wifi", "param", "info", "custom",
-                        "sep",  "restart", "exit"};
+  const char* menu[] = {"wifi", "custom", "sep", "restart", "exit"};
   manager.setMenu(menu, sizeof(menu) / sizeof(menu[0]));
   manager.setWebServerCallback(attachRoutes);
 }
 
-bool inProgress() { return s_in_progress; }
+bool inProgress() {
+  if (s_in_progress &&
+      millis() - s_last_upload_activity_ms > kUploadStallTimeoutMs) {
+    Serial.println("OTA: upload timed out");
+    Update.end();
+    s_upload_error = "Upload timed out";
+    s_in_progress = false;
+  }
+  return s_in_progress;
+}
 
 }  // namespace services::ota

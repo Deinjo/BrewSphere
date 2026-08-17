@@ -2,14 +2,17 @@
 
 #include <lgfx/v1/lgfx_fonts.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstddef>
 #include <cstring>
+#include <pgmspace.h>
 
 #include "config.h"
 #include "hardware/display.h"
 #include "hardware/display_font.h"
+#include "ui/brand_assets.h"
 
 namespace lgfx_fonts = lgfx::v1::fonts;
 
@@ -180,7 +183,40 @@ void drawSpinnerDots() {
   }
 }
 
+uint16_t displayPixel(uint16_t color) {
+  return color;
+}
+
+void drawBrandAsset(const uint16_t* runs, size_t run_word_count) {
+  int pixel = 0;
+  tft.startWrite();
+  for (size_t index = 0; index < run_word_count; index += 2) {
+    int count = pgm_read_word(runs + index);
+    const uint16_t color =
+        displayPixel(pgm_read_word(runs + index + 1));
+    while (count > 0) {
+      const int x = pixel % config::kDisplayWidth;
+      const int length =
+          std::min(count, static_cast<int>(config::kDisplayWidth) - x);
+      tft.drawFastHLine(x, pixel / config::kDisplayWidth, length, color);
+      pixel += length;
+      count -= length;
+    }
+  }
+  tft.endWrite();
+}
+
 }  // namespace
+
+void statusScreenBrand() {
+  drawBrandAsset(ui::brand::kStartupRuns,
+                 ui::brand::kStartupRunWordCount);
+}
+
+void statusScreenBrandWordmark() {
+  drawBrandAsset(ui::brand::kWordmarkStartupRuns,
+                 ui::brand::kWordmarkStartupRunWordCount);
+}
 
 void statusScreenConnectingBegin(const char* ssid) {
   const char* name = (ssid != nullptr && ssid[0] != '\0') ? ssid : "network";

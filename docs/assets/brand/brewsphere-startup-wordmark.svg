@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">BrewSphere two-line startup wordmark</title>
+  <rect width="512" height="512" fill="#071A2A"/>
+  <circle cx="256" cy="256" r="246" fill="#0B3552"/>
+  <circle cx="256" cy="256" r="246" fill="none" stroke="#FFF1C9" stroke-width="6"/>
+  <text x="256" y="233" text-anchor="middle" fill="#FFF1C9"
+        font-family="Noto Sans,Arial,sans-serif" font-size="96" font-weight="700">Brew</text>
+  <text x="256" y="343" text-anchor="middle" fill="#FF9D00"
+        font-family="Noto Sans,Arial,sans-serif" font-size="96" font-weight="700">Sphere</text>
+</svg>

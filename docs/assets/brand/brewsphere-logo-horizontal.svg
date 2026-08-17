@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 360" role="img" aria-labelledby="title">
+  <title id="title">BrewSphere horizontal logo</title>
+  <g transform="translate(28 28) scale(.594)">
+  <defs>
+    <clipPath id="beerClip">
+      <path d="M219 207 C220 252 224 301 229 339 Q256 348 283 339 C288 301 292 252 293 207 Z"/>
+    </clipPath>
+  </defs>
+  <circle cx="256" cy="256" r="246" fill="#0B3552"/>
+  <circle cx="256" cy="256" r="222" fill="none" stroke="#06264A" stroke-width="48"/>
+  <circle cx="256" cy="256" r="222" fill="none" stroke="#FF9D00" stroke-width="48"
+          stroke-dasharray="174.4 1220.5" transform="rotate(-45 256 256)"/>
+  <g stroke="#FFF1C9" stroke-width="10" stroke-linecap="butt">
+    <path d="M394.6 117.4 L430 82"/>
+    <path d="M452 256 L502 256"/>
+    <path d="M394.6 394.6 L430 430"/>
+    <path d="M117.4 394.6 L82 430"/>
+    <path d="M60 256 L10 256"/>
+    <path d="M117.4 117.4 L82 82"/>
+  </g>
+  <circle cx="256" cy="256" r="246" fill="none" stroke="#FFF1C9" stroke-width="6"/>
+  <circle cx="256" cy="256" r="177" fill="none" stroke="#FFF1C9" stroke-width="11"/>
+  <g fill="none" stroke="#FFF1C9" stroke-width="6" stroke-linecap="round">
+    <path d="M169 139 C111 194 111 318 169 373"/>
+    <path d="M343 139 C401 194 401 318 343 373"/>
+  </g>
+  <g clip-path="url(#beerClip)">
+    <path d="M205 273 Q250 286 307 270 L307 365 L205 365 Z" fill="#FF9D00"/>
+    <path d="M205 329 Q256 347 307 326 L307 365 L205 365 Z" fill="#E87300"/>
+  </g>
+  <path d="M205 171 C205 151 222 142 239 148 C248 137 267 137 276 148
+           C294 142 311 151 311 171 Z" fill="#FFF1C9"/>
+  <path d="M207 188 C206 237 210 286 220 350 Q256 365 292 350
+           C302 286 306 237 305 188" fill="none" stroke="#FFF1C9"
+        stroke-width="13" stroke-linecap="square" stroke-linejoin="round"/>
+  <path d="M226 340 Q256 350 286 340" fill="none" stroke="#FFF1C9" stroke-width="8"/>
+  <circle cx="273" cy="237" r="12" fill="#41DEDE" stroke="#FFF1C9" stroke-width="3"/>
+  <circle cx="249" cy="267" r="9" fill="#FF9D00" stroke="#FFF1C9" stroke-width="2"/>
+  <circle cx="267" cy="286" r="10" fill="#BFEFFF" stroke="#FFF1C9" stroke-width="2"/>
+</g>
+  <text x="385" y="174" fill="#0B3552" font-family="Noto Sans,Arial,sans-serif"
+        font-size="88" font-weight="700">BrewSphere</text>
+  <text x="391" y="226" fill="#62869D" font-family="Noto Sans,Arial,sans-serif"
+        font-size="25" font-weight="400">FERMENTATION DISPLAY</text>
+  <rect x="391" y="250" width="330" height="5" rx="2.5" fill="#FF9D00"/>
+</svg>
