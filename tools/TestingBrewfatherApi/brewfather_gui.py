@@ -224,7 +224,8 @@ class BrewfatherGui(tk.Tk):
             "unknown", background="#f8fafc", foreground="#475569",
         )
         self.batch_table.grid(row=0, column=0, sticky="nsew")
-        self.batch_table.bind("<Double-1>", self._copy_batch_id)
+        self.batch_table.bind("<<TreeviewSelect>>", self._select_batch_id)
+        self.batch_table.bind("<Double-1>", self._get_selected_batch)
         table_scrollbar = ttk.Scrollbar(list_frame, command=self.batch_table.yview)
         table_scrollbar.grid(row=0, column=1, sticky="ns")
         self.batch_table.configure(yscrollcommand=table_scrollbar.set)
@@ -404,14 +405,23 @@ class BrewfatherGui(tk.Tk):
         self.mash_steps = []
         self.progress.configure(text="Bereit")
 
-    def _copy_batch_id(self, event):
-        item_id = self.batch_table.identify_row(event.y)
+    def _select_batch_id(self, event=None):
+        item_id = self.batch_table.identify_row(event.y) if event is not None else ""
+        if not item_id:
+            selection = self.batch_table.selection()
+            item_id = selection[0] if selection else ""
         if not item_id:
             return
         values = self.batch_table.item(item_id, "values")
         if len(values) > 2 and values[2]:
             self.batch_id.set(values[2])
             self.progress.configure(text="Batch-ID übernommen")
+
+    def _get_selected_batch(self, event):
+        self._select_batch_id(event)
+        if self.batch_id.get().strip():
+            self._start_endpoint_query("batch")
+        return "break"
 
     def _write_output(self, text):
         self.output.configure(state="normal")
@@ -672,7 +682,7 @@ class BrewfatherGui(tk.Tk):
         if not batch_id:
             messagebox.showerror(
                 "Batch-ID fehlt",
-                "Bitte eine Batch-ID eintragen oder per Doppelklick aus der Liste übernehmen.",
+                "Bitte eine Batch-ID eintragen oder per Klick aus der Liste übernehmen.",
             )
             return
         try:
