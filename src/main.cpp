@@ -7,7 +7,6 @@
 
 #include "config.h"
 #include "hardware/display.h"
-#include "services/adsb_client.h"
 #include "services/brew_settings.h"
 #include "services/display_settings.h"
 #include "services/ota_update.h"
@@ -19,22 +18,22 @@
 
 namespace {
 
-bool g_radar_visible = false;
+bool g_display_visible = false;
 unsigned long g_wifi_down_since = 0;
 unsigned long g_last_reconnect_ms = 0;
 
-void showRadarIfConnected() {
+void showDisplayIfConnected() {
   if (WiFi.status() != WL_CONNECTED) {
-    g_radar_visible = false;
+    g_display_visible = false;
     return;
   }
   services::weather::begin();
   ui::brewDisplayDraw();
-  g_radar_visible = true;
+  g_display_visible = true;
 }
 
-void onRangeTap() {
-  if (g_radar_visible && WiFi.status() == WL_CONNECTED) {
+void onDisplayTap() {
+  if (g_display_visible && WiFi.status() == WL_CONNECTED) {
     ui::brewDisplayDraw();
   }
 }
@@ -42,7 +41,7 @@ void onRangeTap() {
 void handleBootButton() {
   bootButtonPollLongPress();
   if (bootButtonConsumeTap()) {
-    onRangeTap();
+    onDisplayTap();
   }
 }
 
@@ -70,14 +69,14 @@ void setup() {
   services::weather::setPollFn(wifiLoop);
 
   if (wifiSetupConnect()) {
-    showRadarIfConnected();
+    showDisplayIfConnected();
   }
 }
 
 void loop() {
   handleBootButton();
   wifiLoop();
-  if (g_radar_visible) {
+  if (g_display_visible) {
     ui::brewDisplayTick();
   }
 
@@ -87,9 +86,9 @@ void loop() {
   }
 
   if (WiFi.status() != WL_CONNECTED) {
-    if (g_radar_visible) {
+    if (g_display_visible) {
       Serial.println("WiFi lost — will reconnect");
-      g_radar_visible = false;
+      g_display_visible = false;
     }
 
     if (g_wifi_down_since == 0) {
@@ -102,13 +101,13 @@ void loop() {
       g_last_reconnect_ms = millis();
       if (wifiReconnect()) {
         g_wifi_down_since = 0;
-        showRadarIfConnected();
+        showDisplayIfConnected();
       }
     }
   } else {
     g_wifi_down_since = 0;
-    if (!g_radar_visible) {
-      showRadarIfConnected();
+    if (!g_display_visible) {
+      showDisplayIfConnected();
     } else if (services::weather::refreshIfDue(
                    services::location::lat(), services::location::lon())) {
       ui::brewDisplayRefresh();

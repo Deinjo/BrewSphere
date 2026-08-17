@@ -8,14 +8,6 @@
 #include "config_local.h"
 #endif
 
-#ifndef PLANE_RADAR_WIFI_FALLBACK_SSID
-#define PLANE_RADAR_WIFI_FALLBACK_SSID ""
-#endif
-
-#ifndef PLANE_RADAR_WIFI_FALLBACK_PASS
-#define PLANE_RADAR_WIFI_FALLBACK_PASS ""
-#endif
-
 #ifndef BREWFATHER_USER_ID
 #define BREWFATHER_USER_ID ""
 #endif
@@ -24,15 +16,13 @@
 #define BREWFATHER_API_KEY ""
 #endif
 
-// --- Radar center defaults (ECHTE LIEBE ;-) ) 
-#ifndef PLANE_RADAR_DEFAULT_RADAR_LAT
-#define PLANE_RADAR_DEFAULT_RADAR_LAT 51.492605
+// Optional local Wi-Fi fallback.
+#ifndef BREWSPHERE_WIFI_FALLBACK_SSID
+#define BREWSPHERE_WIFI_FALLBACK_SSID ""
 #endif
-
-#ifndef PLANE_RADAR_DEFAULT_RADAR_LON
-#define PLANE_RADAR_DEFAULT_RADAR_LON 7.451828
+#ifndef BREWSPHERE_WIFI_FALLBACK_PASS
+#define BREWSPHERE_WIFI_FALLBACK_PASS ""
 #endif
-
 
 namespace config {
 
@@ -40,12 +30,10 @@ namespace config {
 constexpr char kPortalApName[] = "BrewSphere-Setup";
 constexpr char kPortalIp[] = "192.168.4.1";
 /** mDNS host (no ".local" suffix); browser: http://brewsphere.local */
-constexpr char kPortalHostname[] = "brewsphere";
-constexpr char kPortalHostUrl[] = "brewsphere.local";
-/** Optional compiled fallback Wi-Fi credentials. Empty SSID disables fallback. */
-constexpr char kWifiFallbackSSID[] = PLANE_RADAR_WIFI_FALLBACK_SSID;
-constexpr char kWifiFallbackPass[] = PLANE_RADAR_WIFI_FALLBACK_PASS;
-
+  constexpr char kPortalHostname[] = "brewsphere";
+  constexpr char kPortalHostUrl[] = "brewsphere.local";
+  constexpr char kWifiFallbackSSID[] = BREWSPHERE_WIFI_FALLBACK_SSID;
+  constexpr char kWifiFallbackPass[] = BREWSPHERE_WIFI_FALLBACK_PASS;
 /** Per-attempt STA connect wait (ms); retried kWifiConnectAttempts times. */
 constexpr unsigned long kWifiConnectAttemptMs = 15000;
 constexpr uint8_t kWifiConnectAttempts = 3;
@@ -78,25 +66,9 @@ constexpr uint32_t kDisplaySpiWriteHz = 40000000;
 constexpr bool kDisplayInvert = true;
 constexpr bool kDisplayRgbOrder = false;
 
-// --- Radar center defaults (overridden via WiFi setup portal) ---
-constexpr double kDefaultRadarLat = PLANE_RADAR_DEFAULT_RADAR_LAT;
-constexpr double kDefaultRadarLon = PLANE_RADAR_DEFAULT_RADAR_LON;
-
-/** Poll adsb.fi (API public limit: 1 req/s). */
-constexpr unsigned long kAdsbFetchIntervalMs = 3000;
-/** Legacy scale unused — fetch uses radar::fetchRadiusKm() to screen edge. */
-constexpr float kAdsbFetchRadiusScale = 1.0f;
-/** false = hide aircraft with alt_baro "ground"; true = show them too. */
-constexpr bool kAdsbShowGroundAircraft = false;
-
-// --- Flight enrichment (origin/destination and detailed aircraft type) ---
-constexpr char kFlightDataApiBase[] = "https://api.adsbdb.com/v0/";
-/** One lookup at a time; successful results remain cached for six hours. */
-constexpr unsigned long kFlightLookupMinIntervalMs = 750UL;
-constexpr unsigned long kFlightLookupTimeoutMs = 5000UL;
-constexpr unsigned long kFlightLookupFailureBackoffMs = 30000UL;
-constexpr unsigned long kFlightCacheSuccessMs = 6UL * 60UL * 60UL * 1000UL;
-constexpr unsigned long kFlightCacheMissMs = 10UL * 60UL * 1000UL;
+// --- Location defaults used to identify refresh-coordinate changes ---
+constexpr double kDefaultLocationLat = 51.492605;
+constexpr double kDefaultLocationLon = 7.451828;
 
 // --- Brewfather and local time ---
 constexpr char kBrewfatherApiBase[] = "https://api.brewfather.app/v2";
